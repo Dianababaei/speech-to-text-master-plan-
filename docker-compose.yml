@@ -1,6 +1,105 @@
 version: '3.8'
 
 services:
+  # Redis service for job queue
+  redis:
+    image: redis:7-alpine
+    container_name: transcription-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - transcription-network
+
+  # FastAPI application server (to be added in future tasks)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: transcription-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - transcription-network
+    # Uncomment when FastAPI is implemented
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # RQ Worker for processing transcription jobs
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: transcription-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - QUEUE_NAME=transcription_jobs
+      - WORKER_COUNT=2
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - transcription-network
+    command: python -m app.workers.transcription_worker
+    deploy:
+      replicas: 2  # Run 2 worker instances
+
+  # Additional worker for high-priority jobs (optional)
+  worker-high-priority:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: transcription-worker-high
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - QUEUE_NAME=transcription_jobs_high
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - transcription-network
+    command: python -m app.workers.transcription_worker
+    # Uncomment to enable high-priority workers
+    # profiles:
+    #   - high-priority
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  transcription-network:
+    driver: bridge
   api:
     build: .
     container_name: transcription-api

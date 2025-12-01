@@ -26,6 +26,11 @@ env/
 ENV/
 .venv
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 # IDE
 .vscode/
 .idea/
@@ -33,6 +38,28 @@ ENV/
 *.swo
 *~
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# Uploads and data
+uploads/
+data/
+*.mp3
+*.wav
+*.m4a
+
+# Redis
+dump.rdb
+
+# Docker
+docker-compose.override.yml
 # Environment variables
 .env
 

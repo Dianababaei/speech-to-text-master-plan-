@@ -1,200 +1,621 @@
 """
-Transcription worker module for processing audio transcription jobs.
+Worker for processing transcription jobs.
 
-This module contains:
-- Worker entry point for RQ
-- Job processing function
-- Error handling and retry logic
-- Graceful shutdown handling
+This module contains the main worker function that orchestrates the complete
+transcription workflow from job pickup to result storage.
 """
-
 import os
-import sys
-import signal
-import logging
-from typing import Optional, Dict, Any
+import traceback
 from pathlib import Path
+from time import time
+from typing import Optional
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+from app.models.job import Job
+from app.services.job_service import (
+    get_job,
+    update_job_status,
+    JobNotFoundError,
+    JobServiceError,
 )
-logger = logging.getLogger(__name__)
+from app.services.openai_service import (
+    transcribe_audio,
+    OpenAIServiceError,
+    OpenAIQuotaError,
+    OpenAIAPIError,
+)
+from app.services.postprocessing_service import (
+    process_transcription,
+    PostProcessingError,
+)
+from app.utils.database import db_session_context
+from app.utils.logging import get_logger, log_with_context
+from app.config import TEMP_AUDIO_DIR
 
-# Track shutdown state
-_shutdown_requested = False
-
-
-def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully."""
-    global _shutdown_requested
-    signal_name = signal.Signals(signum).name
-    logger.info(f"Received signal {signal_name}, initiating graceful shutdown...")
-    _shutdown_requested = True
-
-
-# Register signal handlers
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
+logger = get_logger(__name__)
 
 
-def process_transcription_job(
-    job_id: str,
-    audio_file_path: str,
-    lexicon_id: Optional[str] = None,
-    api_key_id: Optional[str] = None,
-) -> Dict[str, Any]:
+def cleanup_audio_file(file_path: str, job_id: str) -> None:
     """
-    Process a transcription job.
-    
-    This is the main worker function that will be called by RQ workers.
-    It processes the audio file and updates the job status in the database.
+    Clean up temporary audio file with error handling.
     
     Args:
-        job_id: Unique identifier for the job
-        audio_file_path: Path to the audio file to transcribe
-        lexicon_id: Optional ID of the lexicon to use
-        api_key_id: Optional API key identifier for OpenAI
+        file_path: Path to audio file to delete
+        job_id: Job ID for logging context
+    """
+    if not file_path:
+        return
+    
+    try:
+        path = Path(file_path)
+        if path.exists():
+            path.unlink()
+            log_with_context(
+                logger,
+                logger.INFO,
+                f"Audio file cleaned up successfully",
+                job_id=job_id,
+                file_path=file_path
+            )
+        else:
+            log_with_context(
+                logger,
+                logger.WARNING,
+                f"Audio file not found for cleanup (may have been deleted already)",
+                job_id=job_id,
+                file_path=file_path
+            )
+    except Exception as e:
+        log_with_context(
+            logger,
+            logger.ERROR,
+            f"Error cleaning up audio file: {str(e)}",
+            job_id=job_id,
+            file_path=file_path,
+            error_type=type(e).__name__
+        )
+
+
+def load_audio_file(file_path: str, job_id: str) -> Path:
+    """
+    Load and validate audio file.
+    
+    Args:
+        file_path: Path to audio file
+        job_id: Job ID for logging context
     
     Returns:
-        Dict containing the transcription results
+        Path object for the audio file
     
     Raises:
-        Exception: If job processing fails
+        FileNotFoundError: If file doesn't exist
+        ValueError: If file is not readable or invalid format
     """
-    logger.info(f"Starting transcription job {job_id}")
-    logger.info(f"Audio file: {audio_file_path}")
-    logger.info(f"Lexicon ID: {lexicon_id}")
-    logger.info(f"API Key ID: {api_key_id}")
+    path = Path(file_path)
     
-    try:
-        # Check if shutdown was requested
-        if _shutdown_requested:
-            logger.warning(f"Job {job_id} cancelled due to shutdown request")
-            raise Exception("Worker shutdown requested")
-        
-        # Validate audio file exists
-        audio_path = Path(audio_file_path)
-        if not audio_path.exists():
-            error_msg = f"Audio file not found: {audio_file_path}"
-            logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
-        
-        logger.info(f"Audio file validated: {audio_path.name} ({audio_path.stat().st_size} bytes)")
-        
-        # TODO: Update job status to 'processing' in database
-        # This will be implemented when database integration is added
-        # Example:
-        # update_job_status(job_id, "processing", {"started_at": datetime.utcnow()})
-        
-        # TODO: Load lexicon if provided
-        # This will be implemented when lexicon service is added
-        # Example:
-        # lexicon = load_lexicon(lexicon_id) if lexicon_id else None
-        
-        # TODO: Call OpenAI Whisper API for transcription
-        # This will be implemented in the next task
-        # Example:
-        # transcription_result = transcribe_audio(
-        #     audio_file_path=audio_file_path,
-        #     lexicon=lexicon,
-        #     api_key_id=api_key_id
-        # )
-        
-        # Placeholder result for now
-        result = {
-            "job_id": job_id,
-            "status": "completed",
-            "transcription": "Placeholder transcription text",
-            "audio_file": audio_file_path,
-            "lexicon_id": lexicon_id,
-            "processing_time": 0.0,
-            "word_count": 0,
-        }
-        
-        # TODO: Update job status to 'completed' in database
-        # This will be implemented when database integration is added
-        # Example:
-        # update_job_status(job_id, "completed", {
-        #     "completed_at": datetime.utcnow(),
-        #     "result": result
-        # })
-        
-        logger.info(f"Job {job_id} completed successfully")
-        return result
-        
-    except FileNotFoundError as e:
-        logger.error(f"Job {job_id} failed: {str(e)}")
-        # TODO: Update job status to 'failed' in database
-        raise
-        
-    except Exception as e:
-        logger.error(f"Job {job_id} failed with error: {str(e)}", exc_info=True)
-        # TODO: Update job status to 'failed' in database
-        raise
-
-
-def start_worker():
-    """
-    Start the RQ worker process.
+    # Check if file exists
+    if not path.exists():
+        log_with_context(
+            logger,
+            logger.ERROR,
+            f"Audio file not found",
+            job_id=job_id,
+            file_path=file_path
+        )
+        raise FileNotFoundError(f"Audio file not found: {file_path}")
     
-    This is the main entry point for starting worker processes.
-    It can be called from the command line or Docker.
-    """
-    from redis import Redis
-    from rq import Worker
-    from app.services.queue import REDIS_URL, QUEUE_NAME
+    # Check if file is readable
+    if not os.access(path, os.R_OK):
+        log_with_context(
+            logger,
+            logger.ERROR,
+            f"Audio file is not readable",
+            job_id=job_id,
+            file_path=file_path
+        )
+        raise ValueError(f"Audio file is not readable: {file_path}")
     
-    logger.info("=" * 80)
-    logger.info("Starting Transcription Worker")
-    logger.info("=" * 80)
-    logger.info(f"Redis URL: {REDIS_URL}")
-    logger.info(f"Queue Name: {QUEUE_NAME}")
-    logger.info(f"Worker PID: {os.getpid()}")
+    # Check file extension (basic format validation)
+    valid_extensions = {".wav", ".mp3", ".m4a", ".mp4", ".mpeg", ".mpga", ".webm"}
+    if path.suffix.lower() not in valid_extensions:
+        log_with_context(
+            logger,
+            logger.WARNING,
+            f"Audio file has unexpected extension: {path.suffix}",
+            job_id=job_id,
+            file_path=file_path
+        )
     
-    # Connect to Redis
-    redis_conn = Redis.from_url(
-        REDIS_URL,
-        decode_responses=True,
-        socket_keepalive=True,
-        socket_connect_timeout=5
+    log_with_context(
+        logger,
+        logger.INFO,
+        f"Audio file loaded and validated",
+        job_id=job_id,
+        file_path=file_path
     )
     
-    # Test connection
-    try:
-        redis_conn.ping()
-        logger.info("Successfully connected to Redis")
-    except Exception as e:
-        logger.error(f"Failed to connect to Redis: {e}")
-        sys.exit(1)
+    return path
+
+
+def process_transcription_job(job_id: str) -> None:
+    """
+    Main worker function to process a transcription job.
     
-    # Create worker
-    worker = Worker(
-        [QUEUE_NAME],
-        connection=redis_conn,
-        name=f"worker-{os.getpid()}",
-        log_job_description=True,
+    This function orchestrates the complete transcription workflow:
+    1. Fetch job from database
+    2. Update job status to 'processing'
+    3. Load audio file from temporary storage
+    4. Call OpenAI service for transcription
+    5. Store original_text
+    6. Trigger post-processing pipeline
+    7. Store processed_text
+    8. Update job status to 'completed'
+    9. Clean up temporary audio file
+    
+    On error:
+    - Update status to 'failed'
+    - Store error_message
+    - Clean up audio file
+    
+    Args:
+        job_id: The ID of the job to process
+    """
+    start_time = time()
+    audio_file_path = None
+    
+    log_with_context(
+        logger,
+        logger.INFO,
+        f"Starting transcription job processing",
+        job_id=job_id
     )
     
-    logger.info(f"Worker '{worker.name}' ready to process jobs from queue '{QUEUE_NAME}'")
-    logger.info("Press Ctrl+C to stop the worker")
-    logger.info("=" * 80)
-    
     try:
-        # Start working
-        worker.work(with_scheduler=True)
-    except KeyboardInterrupt:
-        logger.info("Worker interrupted by user")
+        # Step 1: Fetch job from database
+        with db_session_context() as session:
+            try:
+                job = get_job(job_id, session=session)
+                audio_file_path = job.audio_file_path
+                lexicon_id = job.lexicon_id
+                
+                log_with_context(
+                    logger,
+                    logger.INFO,
+                    f"Job loaded from database",
+                    job_id=job_id,
+                    status=job.status,
+                    file_path=audio_file_path
+                )
+            
+            except JobNotFoundError as e:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Job not found in database: {str(e)}",
+                    job_id=job_id,
+                    error_type="JobNotFoundError"
+                )
+                # Can't update status if job doesn't exist
+                return
+            
+            except JobServiceError as e:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Database error loading job: {str(e)}",
+                    job_id=job_id,
+                    error_type="JobServiceError"
+                )
+                # Can't proceed if database is failing
+                return
+        
+        # Step 2: Update job status to 'processing'
+        try:
+            with db_session_context() as session:
+                update_job_status(job_id, "processing", session=session)
+            
+            log_with_context(
+                logger,
+                logger.INFO,
+                f"Job status updated to processing",
+                job_id=job_id,
+                status="processing"
+            )
+        
+        except (JobServiceError, JobNotFoundError) as e:
+            log_with_context(
+                logger,
+                logger.ERROR,
+                f"Failed to update job status to processing: {str(e)}",
+                job_id=job_id,
+                error_type=type(e).__name__
+            )
+            # Continue anyway - we'll try to mark as failed at the end
+        
+        # Step 3: Load audio file
+        try:
+            audio_path = load_audio_file(audio_file_path, job_id)
+        
+        except FileNotFoundError as e:
+            error_msg = f"Audio file not found: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type="FileNotFoundError",
+                file_path=audio_file_path
+            )
+            
+            # Mark job as failed
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+            
+            return
+        
+        except ValueError as e:
+            error_msg = f"Invalid audio file: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type="ValueError",
+                file_path=audio_file_path
+            )
+            
+            # Mark job as failed
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+            
+            # Cleanup
+            cleanup_audio_file(audio_file_path, job_id)
+            return
+        
+        # Step 4: Call OpenAI service for transcription
+        original_text = None
+        try:
+            transcription_start = time()
+            original_text = transcribe_audio(str(audio_path))
+            transcription_duration = time() - transcription_start
+            
+            log_with_context(
+                logger,
+                logger.INFO,
+                f"OpenAI transcription completed",
+                job_id=job_id,
+                duration=transcription_duration
+            )
+        
+        except OpenAIQuotaError as e:
+            error_msg = f"OpenAI quota exceeded: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type="OpenAIQuotaError"
+            )
+            
+            # Mark job as failed (could be retried later by external system)
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+            
+            # Cleanup
+            cleanup_audio_file(audio_file_path, job_id)
+            return
+        
+        except OpenAIAPIError as e:
+            error_msg = f"OpenAI API error: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type="OpenAIAPIError"
+            )
+            
+            # Mark job as failed
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+            
+            # Cleanup
+            cleanup_audio_file(audio_file_path, job_id)
+            return
+        
+        except OpenAIServiceError as e:
+            error_msg = f"OpenAI service error: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type="OpenAIServiceError"
+            )
+            
+            # Mark job as failed
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+            
+            # Cleanup
+            cleanup_audio_file(audio_file_path, job_id)
+            return
+        
+        # Step 5: Store original_text in database
+        try:
+            with db_session_context() as session:
+                update_job_status(
+                    job_id,
+                    "processing",
+                    session=session,
+                    original_text=original_text
+                )
+            
+            log_with_context(
+                logger,
+                logger.INFO,
+                f"Original transcription text stored",
+                job_id=job_id
+            )
+        
+        except (JobServiceError, JobNotFoundError) as e:
+            error_msg = f"Failed to store original_text: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type=type(e).__name__
+            )
+            
+            # Mark job as failed
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg,
+                        original_text=original_text  # Try to save it anyway
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+            
+            # Cleanup
+            cleanup_audio_file(audio_file_path, job_id)
+            return
+        
+        # Step 6: Trigger post-processing pipeline
+        processed_text = None
+        post_processing_failed = False
+        
+        try:
+            postproc_start = time()
+            processed_text = process_transcription(original_text, lexicon_id)
+            postproc_duration = time() - postproc_start
+            
+            log_with_context(
+                logger,
+                logger.INFO,
+                f"Post-processing completed",
+                job_id=job_id,
+                duration=postproc_duration
+            )
+        
+        except PostProcessingError as e:
+            # Post-processing failure is not fatal - we still have original_text
+            log_with_context(
+                logger,
+                logger.WARNING,
+                f"Post-processing failed, but original_text is valid: {str(e)}",
+                job_id=job_id,
+                error_type="PostProcessingError"
+            )
+            post_processing_failed = True
+            processed_text = None  # No processed text available
+        
+        except Exception as e:
+            # Unexpected post-processing error
+            log_with_context(
+                logger,
+                logger.WARNING,
+                f"Unexpected post-processing error: {str(e)}",
+                job_id=job_id,
+                error_type=type(e).__name__
+            )
+            post_processing_failed = True
+            processed_text = None
+        
+        # Step 7: Store processed_text and update to completed
+        try:
+            with db_session_context() as session:
+                update_job_status(
+                    job_id,
+                    "completed",
+                    session=session,
+                    processed_text=processed_text
+                )
+            
+            total_duration = time() - start_time
+            
+            log_with_context(
+                logger,
+                logger.INFO,
+                f"Job completed successfully",
+                job_id=job_id,
+                status="completed",
+                duration=total_duration
+            )
+            
+            if post_processing_failed:
+                log_with_context(
+                    logger,
+                    logger.WARNING,
+                    f"Job completed with post-processing warning",
+                    job_id=job_id
+                )
+        
+        except (JobServiceError, JobNotFoundError) as e:
+            error_msg = f"Failed to mark job as completed: {str(e)}"
+            log_with_context(
+                logger,
+                logger.ERROR,
+                error_msg,
+                job_id=job_id,
+                error_type=type(e).__name__
+            )
+            
+            # Try to mark as failed
+            try:
+                with db_session_context() as session:
+                    update_job_status(
+                        job_id,
+                        "failed",
+                        session=session,
+                        error_message=error_msg
+                    )
+            except Exception as update_error:
+                log_with_context(
+                    logger,
+                    logger.ERROR,
+                    f"Failed to mark job as failed: {str(update_error)}",
+                    job_id=job_id
+                )
+        
+        # Step 8: Clean up temporary audio file
+        cleanup_audio_file(audio_file_path, job_id)
+        
+        total_duration = time() - start_time
+        log_with_context(
+            logger,
+            logger.INFO,
+            f"Job processing completed",
+            job_id=job_id,
+            duration=total_duration
+        )
+    
     except Exception as e:
-        logger.error(f"Worker error: {e}", exc_info=True)
-        sys.exit(1)
-    finally:
-        logger.info("Worker shutdown complete")
+        # Catch-all for unexpected exceptions
+        total_duration = time() - start_time
+        error_msg = f"Unexpected error during job processing: {str(e)}"
+        error_traceback = traceback.format_exc()
+        
+        log_with_context(
+            logger,
+            logger.ERROR,
+            f"{error_msg}\n{error_traceback}",
+            job_id=job_id,
+            error_type=type(e).__name__,
+            duration=total_duration
+        )
+        
+        # Try to mark job as failed
+        try:
+            with db_session_context() as session:
+                update_job_status(
+                    job_id,
+                    "failed",
+                    session=session,
+                    error_message=f"{error_msg}\n{error_traceback}"
+                )
+        except Exception as update_error:
+            log_with_context(
+                logger,
+                logger.ERROR,
+                f"Failed to mark job as failed after unexpected error: {str(update_error)}",
+                job_id=job_id
+            )
+        
+        # Clean up audio file
+        if audio_file_path:
+            cleanup_audio_file(audio_file_path, job_id)
 
 
-if __name__ == "__main__":
-    start_worker()
+# Worker function registration for RQ (Redis Queue)
+# This decorator is typically used to register the function with the queue
+# Example usage with RQ:
+#
+# from redis import Redis
+# from rq import Queue
+#
+# redis_conn = Redis(host='localhost', port=6379, db=0)
+# queue = Queue('transcription', connection=redis_conn)
+#
+# # Enqueue a job
+# job = queue.enqueue(process_transcription_job, job_id='some-job-id')
+#
+# # Or use the @job decorator if using RQ workers directly:
+# from rq.decorators import job
+# 
+# @job('transcription', connection=redis_conn, timeout=600)
+# def process_transcription_job_decorated(job_id: str):
+#     return process_transcription_job(job_id)

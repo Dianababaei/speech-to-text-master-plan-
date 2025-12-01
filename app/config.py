@@ -1,126 +1,70 @@
 """
-Configuration management using pydantic-settings.
-Environment variables are loaded from .env file or system environment.
+Configuration module for the application.
+
+This module manages application settings and configuration, including database
+connection parameters. Settings can be overridden using environment variables.
+
+Environment Variables:
+    DATABASE_URL: PostgreSQL connection string
+                  Format: postgresql://user:password@host:port/dbname
+                  Default: postgresql://postgres:postgres@localhost:5432/transcription_db
+    
+    DB_POOL_SIZE: Number of persistent connections in the pool (default: 5)
+    DB_MAX_OVERFLOW: Max additional connections beyond pool_size (default: 10)
+    DB_POOL_RECYCLE: Seconds before recycling connections (default: 3600)
+    DB_ECHO: Enable SQL query logging for debugging (default: False)
+    
+    ENVIRONMENT: Application environment (dev/test/production) (default: dev)
 """
 
-from typing import Literal
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+from typing import Optional
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 class Settings(BaseSettings):
-    """
-    Application settings loaded from environment variables.
+    """Application settings with environment variable support."""
     
-    All settings can be overridden via environment variables or .env file.
-    Required fields will cause validation errors if not provided.
-    """
+    # Application settings
+    environment: str = Field(default="dev", alias="ENVIRONMENT")
     
-    # Database Configuration
-    DATABASE_URL: str = Field(
-        ...,
-        description="PostgreSQL connection string (e.g., postgresql://user:pass@localhost:5432/dbname)"
+    # Database connection settings
+    database_url: str = Field(
+        default="postgresql://postgres:postgres@localhost:5432/transcription_db",
+        alias="DATABASE_URL"
     )
     
-    # Redis Configuration
-    REDIS_URL: str = Field(
-        ...,
-        description="Redis connection string (e.g., redis://localhost:6379/0)"
-    )
+    # Database connection pool settings
+    db_pool_size: int = Field(default=5, alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=10, alias="DB_MAX_OVERFLOW")
+    db_pool_recycle: int = Field(default=3600, alias="DB_POOL_RECYCLE")
+    db_echo: bool = Field(default=False, alias="DB_ECHO")
     
-    # OpenAI Configuration
-    OPENAI_API_KEY: str = Field(
-        ...,
-        description="OpenAI API key for transcription services"
-    )
+    # Connection testing
+    db_pool_pre_ping: bool = Field(default=True, alias="DB_POOL_PRE_PING")
     
-    # File Processing Configuration
-    MAX_FILE_SIZE: int = Field(
-        default=104857600,  # 100 MB in bytes
-        description="Maximum file size in bytes for audio uploads"
-    )
+    class Config:
+        """Pydantic configuration."""
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
     
-    # Worker Configuration
-    MAX_WORKERS: int = Field(
-        default=4,
-        description="Maximum number of concurrent workers for processing"
-    )
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development mode."""
+        return self.environment.lower() in ["dev", "development"]
     
-    # Environment Configuration
-    ENVIRONMENT: Literal["dev", "prod"] = Field(
-        default="dev",
-        description="Application environment (dev or prod)"
-    )
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production mode."""
+        return self.environment.lower() in ["prod", "production"]
     
-    # CORS Configuration
-    CORS_ORIGINS: str = Field(
-        default="http://localhost:3000,http://localhost:8000",
-        description="Comma-separated list of allowed CORS origins"
-    )
-    
-    # Application Configuration
-    APP_TITLE: str = Field(
-        default="Speech-to-Text API",
-        description="Application title for OpenAPI docs"
-    )
-    
-    APP_DESCRIPTION: str = Field(
-        default="Multi-language speech transcription API using OpenAI models",
-        description="Application description for OpenAPI docs"
-    )
-    
-    APP_VERSION: str = Field(
-        default="0.1.0",
-        description="Application version"
-    )
-    
-    # Logging Configuration
-    LOG_LEVEL: str = Field(
-        default="INFO",
-        description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
-    )
-    
-    @field_validator("MAX_FILE_SIZE")
-    @classmethod
-    def validate_max_file_size(cls, v: int) -> int:
-        """Ensure MAX_FILE_SIZE is positive and reasonable."""
-        if v <= 0:
-            raise ValueError("MAX_FILE_SIZE must be positive")
-        if v > 1073741824:  # 1 GB
-            raise ValueError("MAX_FILE_SIZE cannot exceed 1 GB")
-        return v
-    
-    @field_validator("MAX_WORKERS")
-    @classmethod
-    def validate_max_workers(cls, v: int) -> int:
-        """Ensure MAX_WORKERS is positive and reasonable."""
-        if v <= 0:
-            raise ValueError("MAX_WORKERS must be positive")
-        if v > 100:
-            raise ValueError("MAX_WORKERS cannot exceed 100")
-        return v
-    
-    @field_validator("LOG_LEVEL")
-    @classmethod
-    def validate_log_level(cls, v: str) -> str:
-        """Ensure LOG_LEVEL is valid."""
-        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        v_upper = v.upper()
-        if v_upper not in valid_levels:
-            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}")
-        return v_upper
-    
-    def get_cors_origins(self) -> list[str]:
-        """Parse CORS_ORIGINS string into a list."""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-    
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore"
-    )
+    @property
+    def is_testing(self) -> bool:
+        """Check if running in test mode."""
+        return self.environment.lower() in ["test", "testing"]
 
 
-# Global settings instance
+# Create a singleton settings instance
 settings = Settings()

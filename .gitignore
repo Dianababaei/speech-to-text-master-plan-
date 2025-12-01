@@ -37,7 +37,6 @@ ENV/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Testing
 .pytest_cache/
@@ -61,3 +60,21 @@ dump.rdb
 
 # Docker
 docker-compose.override.yml
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Audio storage
+audio_storage/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

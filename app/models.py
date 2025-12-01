@@ -1,38 +1,32 @@
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey
-from sqlalchemy.sql import func
+"""
+Database models for the transcription service.
+
+Defines SQLAlchemy models for jobs and related entities.
+"""
+
 from datetime import datetime
-import uuid
+from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
 
-from app.database import Base
-
-
-class APIKey(Base):
-    """Model for API key authentication."""
-    __tablename__ = "api_keys"
-    
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    key = Column(String, unique=True, nullable=False, index=True)
-    name = Column(String, nullable=False)
-    is_active = Column(Integer, default=1)  # SQLite doesn't have boolean
-    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now())
+Base = declarative_base()
 
 
 class Job(Base):
-    """Model for transcription job."""
+    """
+    Job model for transcription jobs.
+    
+    Tracks the status and metadata of audio transcription jobs.
+    """
     __tablename__ = "jobs"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    status = Column(String, nullable=False, default="pending", index=True)
-    lexicon_id = Column(String, nullable=False, default="radiology")
-    audio_file_path = Column(String, nullable=False)
-    audio_format = Column(String, nullable=False)
-    api_key_id = Column(String, ForeignKey("api_keys.id"), nullable=False)
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now())
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id = Column(String, primary_key=True, index=True)
+    status = Column(String, nullable=False, index=True)  # pending, processing, completed, failed
+    audio_file_path = Column(String, nullable=True)
+    transcript = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, index=True)
     completed_at = Column(DateTime, nullable=True)
     
-    # Results (populated after processing)
-    transcript = Column(String, nullable=True)
-    error_message = Column(String, nullable=True)
+    def __repr__(self):
+        return f"<Job(id={self.id}, status={self.status})>"

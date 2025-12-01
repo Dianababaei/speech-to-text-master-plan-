@@ -100,3 +100,24 @@ volumes:
 networks:
   transcription-network:
     driver: bridge
+  api:
+    build: .
+    container_name: transcription-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Audio storage volume mount
+      - ./audio_storage:/app/audio_storage
+      # Database persistence
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/transcription.db
+      - AUDIO_STORAGE_PATH=/app/audio_storage
+      - MAX_FILE_SIZE_MB=10
+      - DEFAULT_LEXICON=radiology
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+volumes:
+  audio_storage:
+  data:

@@ -24,7 +24,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
+# Virtual Environment
 venv/
 env/
 ENV/
@@ -38,6 +38,12 @@ htmlcov/
 .hypothesis/
 
 # IDEs
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -62,3 +68,43 @@ Thumbs.db
 # Logs
 *.log
 logs/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# Uploads and data
+uploads/
+data/
+*.mp3
+*.wav
+*.m4a
+
+# Redis
+dump.rdb
+
+# Docker
+docker-compose.override.yml
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Audio storage
+audio_storage/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

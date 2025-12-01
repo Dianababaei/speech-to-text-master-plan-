@@ -1,8 +1,7 @@
-# Database
-alembic==1.13.1
-SQLAlchemy==2.0.25
-psycopg2-binary==2.9.9
+# OpenAI API client for Whisper transcription
+openai>=1.12.0
 
-# Web Framework (for future FastAPI integration)
-# fastapi==0.109.0
-# uvicorn[standard]==0.27.0
+# Testing dependencies
+pytest>=7.4.0
+pytest-mock>=3.12.0
+pytest-cov>=4.1.0

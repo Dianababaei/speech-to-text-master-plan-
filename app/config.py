@@ -1,70 +1,50 @@
 """
-Configuration module for the application.
+Configuration module for OpenAI API settings.
 
-This module manages application settings and configuration, including database
-connection parameters. Settings can be overridden using environment variables.
-
-Environment Variables:
-    DATABASE_URL: PostgreSQL connection string
-                  Format: postgresql://user:password@host:port/dbname
-                  Default: postgresql://postgres:postgres@localhost:5432/transcription_db
-    
-    DB_POOL_SIZE: Number of persistent connections in the pool (default: 5)
-    DB_MAX_OVERFLOW: Max additional connections beyond pool_size (default: 10)
-    DB_POOL_RECYCLE: Seconds before recycling connections (default: 3600)
-    DB_ECHO: Enable SQL query logging for debugging (default: False)
-    
-    ENVIRONMENT: Application environment (dev/test/production) (default: dev)
+Loads configuration from environment variables with sensible defaults.
 """
-
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field
 
 
-class Settings(BaseSettings):
-    """Application settings with environment variable support."""
+class OpenAIConfig:
+    """Configuration for OpenAI API integration."""
     
-    # Application settings
-    environment: str = Field(default="dev", alias="ENVIRONMENT")
+    def __init__(self):
+        """Initialize OpenAI configuration from environment variables."""
+        self.api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+        self.model: str = os.getenv("OPENAI_MODEL", "whisper-1")
+        self.timeout: int = int(os.getenv("OPENAI_TIMEOUT", "60"))
+        self.max_retries: int = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        self.initial_retry_delay: float = float(os.getenv("OPENAI_INITIAL_RETRY_DELAY", "1.0"))
+        self.max_retry_delay: float = float(os.getenv("OPENAI_MAX_RETRY_DELAY", "60.0"))
+        self.retry_multiplier: float = float(os.getenv("OPENAI_RETRY_MULTIPLIER", "2.0"))
     
-    # Database connection settings
-    database_url: str = Field(
-        default="postgresql://postgres:postgres@localhost:5432/transcription_db",
-        alias="DATABASE_URL"
-    )
-    
-    # Database connection pool settings
-    db_pool_size: int = Field(default=5, alias="DB_POOL_SIZE")
-    db_max_overflow: int = Field(default=10, alias="DB_MAX_OVERFLOW")
-    db_pool_recycle: int = Field(default=3600, alias="DB_POOL_RECYCLE")
-    db_echo: bool = Field(default=False, alias="DB_ECHO")
-    
-    # Connection testing
-    db_pool_pre_ping: bool = Field(default=True, alias="DB_POOL_PRE_PING")
-    
-    class Config:
-        """Pydantic configuration."""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-    
-    @property
-    def is_development(self) -> bool:
-        """Check if running in development mode."""
-        return self.environment.lower() in ["dev", "development"]
-    
-    @property
-    def is_production(self) -> bool:
-        """Check if running in production mode."""
-        return self.environment.lower() in ["prod", "production"]
-    
-    @property
-    def is_testing(self) -> bool:
-        """Check if running in test mode."""
-        return self.environment.lower() in ["test", "testing"]
+    def validate(self) -> None:
+        """
+        Validate configuration at startup.
+        
+        Raises:
+            ValueError: If required configuration is missing or invalid.
+        """
+        if not self.api_key:
+            raise ValueError(
+                "OPENAI_API_KEY environment variable is not set. "
+                "Please configure your OpenAI API key."
+            )
+        
+        if self.model not in ["whisper-1", "gpt-4o-transcribe"]:
+            raise ValueError(
+                f"Invalid model '{self.model}'. "
+                "Must be 'whisper-1' or 'gpt-4o-transcribe'."
+            )
+        
+        if self.timeout <= 0:
+            raise ValueError(f"Timeout must be positive, got {self.timeout}")
+        
+        if self.max_retries < 0:
+            raise ValueError(f"Max retries must be non-negative, got {self.max_retries}")
 
 
-# Create a singleton settings instance
-settings = Settings()
+# Global configuration instance
+config = OpenAIConfig()

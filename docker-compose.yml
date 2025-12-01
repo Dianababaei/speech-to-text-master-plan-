@@ -1,86 +1,24 @@
 version: '3.8'
 
 services:
-  # FastAPI Application Service
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: stt-api
+    build: .
+    container_name: transcription-api
     ports:
       - "8000:8000"
+    volumes:
+      # Audio storage volume mount
+      - ./audio_storage:/app/audio_storage
+      # Database persistence
+      - ./data:/app/data
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-104857600}
-    volumes:
-      - ./audio_files:/app/audio_files
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - DATABASE_URL=sqlite:///./data/transcription.db
+      - AUDIO_STORAGE_PATH=/app/audio_storage
+      - MAX_FILE_SIZE_MB=10
+      - DEFAULT_LEXICON=radiology
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - stt-network
 
-  # Redis Service - Job Queue and Caching
-  redis:
-    image: redis:7-alpine
-    container_name: stt-redis
-    command: >
-      redis-server
-      --appendonly yes
-      --maxmemory ${REDIS_MAXMEMORY:-256mb}
-      --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - stt-network
-
-  # PostgreSQL Database Service
-  postgres:
-    image: postgres:15-alpine
-    container_name: stt-postgres
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - stt-network
-
-# Named Volumes for Data Persistence
 volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-
-# Internal Docker Network
-networks:
-  stt-network:
-    driver: bridge
+  audio_storage:
+  data:

@@ -1,3 +1,7 @@
+# Environment variables
+.env
+.env.local
+
 # Python
 __pycache__/
 *.py[cod]
@@ -26,6 +30,14 @@ env/
 ENV/
 .venv
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# IDEs
 # Environment variables
 .env
 .env.local
@@ -38,6 +50,24 @@ ENV/
 *.swo
 *~
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Audio files (for testing)
+*.mp3
+*.wav
+*.m4a
+*.mp4
+*.mpeg
+*.mpga
+*.webm
+*.ogg
+*.flac
+
+# Logs
+*.log
+logs/
 # Testing
 .pytest_cache/
 .coverage

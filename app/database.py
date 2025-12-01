@@ -1,26 +1,41 @@
+"""
+Database configuration and session management.
+
+Handles SQLAlchemy engine and session setup.
+"""
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from app.config.settings import settings
+from sqlalchemy.orm import sessionmaker, Session
+from app.config.settings import get_settings
 
-# Create SQLAlchemy engine
+settings = get_settings()
+
+# Create database engine
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10
+    echo=settings.DEBUG
 )
 
-# Create SessionLocal class
+# Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create Base class for models
-Base = declarative_base()
 
 
 def get_db():
     """Dependency for getting database session"""
+def get_db() -> Session:
+    """
+    Get database session.
+    
+    Yields:
+        Session: Database session
+    """
     db = SessionLocal()
     try:
         yield db

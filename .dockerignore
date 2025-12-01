@@ -1,0 +1,86 @@
+# Git files and directories
+.git
+.gitignore
+.gitattributes
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+virtualenv/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment and secrets
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# Testing
+tests/
+test/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+
+# Documentation
+docs/
+*.md
+LICENSE
+README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Docker files (no need to copy these into the image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
+logs/
+
+# Database files (shouldn't be in image)
+*.db
+*.sqlite
+*.sqlite3
+
+# Media and large files
+uploads/
+media/
+*.mp4
+*.avi
+*.mov
+
+# Temporary files
+tmp/
+temp/
+*.tmp

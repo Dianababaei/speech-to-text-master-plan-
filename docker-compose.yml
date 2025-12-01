@@ -1,123 +1,66 @@
 version: '3.8'
 
 services:
-  # Redis service for job queue
-  redis:
-    image: redis:7-alpine
-    container_name: transcription-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: transcription
     volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U user"]
       interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - transcription-network
+      timeout: 5s
+      retries: 5
 
-  # FastAPI application server (to be added in future tasks)
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: transcription-api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - ./app:/app/app
-      - ./uploads:/app/uploads
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - transcription-network
-    # Uncomment when FastAPI is implemented
-    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  # RQ Worker for processing transcription jobs
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: transcription-worker
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QUEUE_NAME=transcription_jobs
-      - WORKER_COUNT=2
-    volumes:
-      - ./app:/app/app
-      - ./uploads:/app/uploads
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - transcription-network
-    command: python -m app.workers.transcription_worker
-    deploy:
-      replicas: 2  # Run 2 worker instances
-
-  # Additional worker for high-priority jobs (optional)
-  worker-high-priority:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: transcription-worker-high
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QUEUE_NAME=transcription_jobs_high
-    volumes:
-      - ./app:/app/app
-      - ./uploads:/app/uploads
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - transcription-network
-    command: python -m app.workers.transcription_worker
-    # Uncomment to enable high-priority workers
-    # profiles:
-    #   - high-priority
-
-volumes:
-  redis-data:
-    driver: local
-
-networks:
-  transcription-network:
-    driver: bridge
-  api:
+  # Web Application
+  web:
     build: .
-    container_name: transcription-api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+      - audio_storage:/app/audio_storage
     ports:
       - "8000:8000"
-    volumes:
-      # Audio storage volume mount
-      - ./audio_storage:/app/audio_storage
-      # Database persistence
-      - ./data:/app/data
     environment:
-      - DATABASE_URL=sqlite:///./data/transcription.db
+      - DATABASE_URL=postgresql://user:password@db:5432/transcription
       - AUDIO_STORAGE_PATH=/app/audio_storage
-      - MAX_FILE_SIZE_MB=10
-      - DEFAULT_LEXICON=radiology
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    restart: unless-stopped
+      - AUDIO_RETENTION_HOURS=24
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=whisper-1
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - CLEANUP_INTERVAL_MINUTES=60
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Worker for background tasks
+  worker:
+    build: .
+    command: python -m app.worker
+    volumes:
+      - .:/app
+      - audio_storage:/app/audio_storage
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/transcription
+      - AUDIO_STORAGE_PATH=/app/audio_storage
+      - AUDIO_RETENTION_HOURS=24
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=whisper-1
+      - LOG_LEVEL=INFO
+      - CLEANUP_INTERVAL_MINUTES=60
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
+  postgres_data:
+    driver: local
   audio_storage:
-  data:
+    driver: local

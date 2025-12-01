@@ -1,360 +1,289 @@
-# Speech-to-Text Prototype
+# OpenAI Whisper API Integration
 
-A speech-to-text prototype built with the OpenAI API (gpt-4o-transcribe / whisper-1) that supports multi-language transcription with custom lexicon support.
+A robust integration layer for OpenAI's Whisper API to handle audio transcription with comprehensive error handling, retry logic, and multilingual support.
 
-## Project Overview
+## Features
 
-This project transcribes multi-language audio while keeping each word in its original language or script (code-switching). It includes feedback mechanisms for continuous learning and improvement.
+- ✅ **Multiple Audio Formats**: Supports WAV, MP3, M4A, MP4, MPEG, MPGA, WebM, OGG, and FLAC
+- ✅ **Multilingual Support**: Automatic language detection with code-switching preservation
+- ✅ **Robust Error Handling**: Specific exception types for different error scenarios
+- ✅ **Retry Logic**: Exponential backoff for transient failures (network errors, 5xx)
+- ✅ **Configurable**: Environment variable-based configuration
+- ✅ **Production Ready**: Comprehensive logging and monitoring capabilities
+- ✅ **Fully Tested**: Unit tests with mocked API responses
 
-## Database Setup
+## Installation
 
-### Prerequisites
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-- Python 3.8+
-- PostgreSQL 12+
-- Alembic (installed via `pip install alembic`)
-- psycopg2 or psycopg2-binary (PostgreSQL driver)
+2. Set up environment variables:
+```bash
+export OPENAI_API_KEY="your-api-key-here"
+export OPENAI_MODEL="whisper-1"  # Optional: defaults to whisper-1
+export OPENAI_TIMEOUT="60"       # Optional: defaults to 60 seconds
+```
 
-### Environment Variables
+## Quick Start
 
-Set the following environment variables for database connection:
+### Basic Usage
+
+```python
+from app.services.openai_service import transcribe_audio
+
+# Transcribe an audio file
+text = transcribe_audio("/path/to/audio.mp3")
+print(text)
+```
+
+### With Language Specification
+
+```python
+# Specify language for better accuracy (ISO-639-1 code)
+text = transcribe_audio("/path/to/audio.mp3", language="es")
+```
+
+### Using the Service Class
+
+```python
+from app.services.openai_service import OpenAITranscriptionService
+
+# Create service instance
+service = OpenAITranscriptionService()
+
+# Transcribe audio
+text = service.transcribe_audio("/path/to/audio.mp3")
+```
+
+## Configuration
+
+All configuration is done via environment variables:
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `OPENAI_API_KEY` | Your OpenAI API key | None | Yes |
+| `OPENAI_MODEL` | Whisper model to use | `whisper-1` | No |
+| `OPENAI_TIMEOUT` | API request timeout (seconds) | `60` | No |
+| `OPENAI_MAX_RETRIES` | Maximum retry attempts | `3` | No |
+| `OPENAI_INITIAL_RETRY_DELAY` | Initial retry delay (seconds) | `1.0` | No |
+| `OPENAI_MAX_RETRY_DELAY` | Maximum retry delay (seconds) | `60.0` | No |
+| `OPENAI_RETRY_MULTIPLIER` | Retry backoff multiplier | `2.0` | No |
+
+### Supported Models
+
+- `whisper-1` (default): Standard Whisper model
+- `gpt-4o-transcribe`: Advanced GPT-4o transcription model
+
+## Error Handling
+
+The integration provides specific exception types for different error scenarios:
+
+```python
+from app.exceptions import (
+    APIKeyError,           # 401: Invalid or missing API key
+    AudioFormatError,      # 400: Invalid audio format
+    RateLimitError,        # 429: Rate limit exceeded
+    APITimeoutError,       # Request timeout
+    NetworkError,          # Network/connection errors
+    ServerError,           # 5xx: Server errors
+    FileNotFoundError,     # File doesn't exist
+    MaxRetriesExceededError  # All retry attempts failed
+)
+
+try:
+    text = transcribe_audio("/path/to/audio.mp3")
+except APIKeyError as e:
+    print(f"API key error: {e}")
+except AudioFormatError as e:
+    print(f"Invalid audio format: {e}")
+except RateLimitError as e:
+    print(f"Rate limited. Retry after {e.retry_after} seconds")
+except MaxRetriesExceededError as e:
+    print(f"Failed after {e.attempts} attempts: {e.last_error}")
+```
+
+## Retry Behavior
+
+The service automatically retries **transient errors** with exponential backoff:
+
+- **Retried**: Network errors, server errors (5xx), timeouts
+- **Not Retried**: Authentication errors, invalid audio format, rate limits
+- **Backoff**: Exponential with configurable initial delay and multiplier
+- **Max Delay**: Capped at configured maximum
+
+Example retry sequence (default config):
+- Attempt 1: Immediate
+- Attempt 2: After 1.0s
+- Attempt 3: After 2.0s
+- Attempt 4: After 4.0s
+
+## Logging
+
+The service logs important events for debugging and monitoring:
+
+```python
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+# Service logs will include:
+# - Client initialization
+# - Transcription start (file, size, model)
+# - Transcription completion (duration, text length)
+# - Errors and retry attempts
+```
+
+## Testing
+
+Run the test suite:
 
 ```bash
-# Database Configuration
-export DB_HOST=localhost          # PostgreSQL host
-export DB_PORT=5432               # PostgreSQL port
-export DB_NAME=speech_to_text     # Database name
-export DB_USER=postgres           # Database user
-export DB_PASSWORD=your_password  # Database password
+# Run all tests
+pytest
 
-# Alternative: Use DATABASE_URL (takes precedence)
-export DATABASE_URL=postgresql://user:password@localhost:5432/speech_to_text
+# Run with coverage
+pytest --cov=app --cov-report=html
+
+# Run specific test file
+pytest tests/test_openai_service.py
+
+# Run specific test
+pytest tests/test_openai_service.py::TestOpenAITranscriptionService::test_transcribe_audio_success
 ```
 
-### Database Schema
+## Multilingual Support
 
-The application uses four core tables:
+### Automatic Language Detection
 
-1. **api_keys** - API authentication keys
-2. **lexicon_terms** - Domain-specific terms for transcription improvement
-3. **jobs** - Transcription jobs and their status
-4. **feedback** - Reviewer corrections and learning data
+By default, Whisper automatically detects the language:
 
-## Migration Management
+```python
+text = transcribe_audio("multilingual_audio.mp3")
+# Whisper detects language automatically
+```
 
-This project uses [Alembic](https://alembic.sqlalchemy.org/) for database schema migrations.
+### Explicit Language Specification
 
-### Initial Setup
+For better accuracy, specify the primary language:
 
-1. **Install dependencies**:
-   ```bash
-   pip install alembic psycopg2-binary
-   ```
+```python
+# Spanish audio
+text = transcribe_audio("spanish_audio.mp3", language="es")
 
-2. **Configure environment variables** (see above)
+# Chinese audio
+text = transcribe_audio("chinese_audio.mp3", language="zh")
 
-3. **Run initial migration**:
-   ```bash
-   alembic upgrade head
-   ```
+# Arabic audio
+text = transcribe_audio("arabic_audio.mp3", language="ar")
+```
 
-### Manual Migration Commands
+### Code-Switching
 
-#### Apply all migrations
+The service preserves original language/script for each word in multilingual audio:
+
+```python
+# Audio with English and Spanish
+text = transcribe_audio("code_switched_audio.mp3")
+# Result: "Hello amigo, how are you? Muy bien, gracias!"
+```
+
+## Architecture
+
+```
+app/
+├── __init__.py
+├── config.py              # Configuration from environment variables
+├── exceptions.py          # Custom exception classes
+└── services/
+    ├── __init__.py
+    └── openai_service.py  # Main transcription service
+
+tests/
+├── __init__.py
+└── test_openai_service.py # Comprehensive unit tests
+```
+
+## API Reference
+
+### `transcribe_audio(file_path: str, language: Optional[str] = None) -> str`
+
+Convenience function to transcribe audio using the global service instance.
+
+**Parameters:**
+- `file_path` (str): Path to the audio file
+- `language` (Optional[str]): ISO-639-1 language code (e.g., 'en', 'es', 'zh')
+
+**Returns:**
+- str: Plain text transcription
+
+**Raises:**
+- Various `TranscriptionError` subclasses based on error type
+
+### `OpenAITranscriptionService`
+
+Main service class for transcription operations.
+
+**Methods:**
+- `transcribe_audio(file_path: str, language: Optional[str] = None) -> str`: Transcribe audio file
+
+## Production Checklist
+
+Before deploying to production:
+
+- [ ] Set `OPENAI_API_KEY` in production environment
+- [ ] Configure appropriate `OPENAI_TIMEOUT` for your audio files
+- [ ] Set up logging aggregation (e.g., CloudWatch, Datadog)
+- [ ] Monitor API call metrics (duration, file size, errors)
+- [ ] Set up alerts for `MaxRetriesExceededError` and `RateLimitError`
+- [ ] Consider audio file size limits (25MB for Whisper API)
+- [ ] Implement rate limiting on your end if processing high volumes
+- [ ] Test with representative audio samples from your use case
+
+## Limitations
+
+- **File Size**: OpenAI Whisper API has a 25MB file size limit
+- **File Format**: Only audio formats are supported (no video processing)
+- **Rate Limits**: Subject to OpenAI API rate limits (varies by account tier)
+- **Cost**: Each API call incurs charges based on audio duration
+
+## Troubleshooting
+
+### "OPENAI_API_KEY environment variable is not set"
+
+Set your API key:
 ```bash
-alembic upgrade head
+export OPENAI_API_KEY="sk-..."
 ```
 
-#### Rollback all migrations
+### "Invalid audio format"
+
+Ensure your file is in a supported format (WAV, MP3, M4A, etc.) and not corrupted.
+
+### "Rate limit exceeded"
+
+Wait for the specified `retry_after` duration or upgrade your OpenAI account tier.
+
+### "Request timed out"
+
+Increase the timeout for large files:
 ```bash
-alembic downgrade base
+export OPENAI_TIMEOUT="120"
 ```
 
-#### Rollback one migration
-```bash
-alembic downgrade -1
-```
+### "Maximum retry attempts exceeded"
 
-#### Show current revision
-```bash
-alembic current
-```
-
-#### Show migration history
-```bash
-alembic history --verbose
-```
-
-#### Create a new migration (after model changes)
-```bash
-alembic revision -m "description of changes"
-```
-
-#### Auto-generate migration from model changes
-```bash
-# Note: Requires SQLAlchemy models to be imported in alembic/env.py
-alembic revision --autogenerate -m "description of changes"
-```
-
-### Docker Integration
-
-#### Approach 1: Auto-Run Migrations on Startup (Recommended)
-
-Use the provided `docker-entrypoint.sh` script to automatically run migrations when the container starts.
-
-**Dockerfile example**:
-```dockerfile
-FROM python:3.11-slim
-
-# Install PostgreSQL client for pg_isready
-RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy application files
-COPY . /app
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Make entrypoint script executable
-RUN chmod +x docker-entrypoint.sh
-
-# Set entrypoint
-ENTRYPOINT ["./docker-entrypoint.sh"]
-
-# Default command (start FastAPI)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-**docker-compose.yml example**:
-```yaml
-version: '3.8'
-
-services:
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: speech_to_text
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: speech_to_text
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      AUTO_MIGRATE: "true"  # Enable automatic migrations
-    depends_on:
-      - db
-
-volumes:
-  postgres_data:
-```
-
-**To disable auto-migration**:
-```yaml
-environment:
-  AUTO_MIGRATE: "false"
-```
-
-#### Approach 2: Manual Migration Execution
-
-Run migrations manually before starting the application:
-
-**Using docker-compose**:
-```bash
-# Start only the database
-docker-compose up -d db
-
-# Run migrations
-docker-compose run --rm app alembic upgrade head
-
-# Start the application
-docker-compose up -d app
-```
-
-**Using docker run**:
-```bash
-# Start database
-docker run -d --name db -e POSTGRES_PASSWORD=postgres postgres:15
-
-# Run migrations
-docker run --rm --network container:db \
-  -e DB_HOST=localhost \
-  -e DB_PASSWORD=postgres \
-  your-app-image alembic upgrade head
-
-# Start application
-docker run -d --name app --network container:db \
-  -e DB_HOST=localhost \
-  -e DB_PASSWORD=postgres \
-  -p 8000:8000 \
-  your-app-image
-```
-
-### Development Workflow
-
-#### 1. Local Development
-
-```bash
-# Set up local environment
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=speech_to_text_dev
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-
-# Run migrations
-alembic upgrade head
-
-# Start development server
-uvicorn app.main:app --reload
-```
-
-#### 2. Testing Migrations
-
-```bash
-# Test upgrade
-alembic upgrade head
-
-# Verify tables were created
-psql -h localhost -U postgres -d speech_to_text -c "\dt"
-
-# Test downgrade
-alembic downgrade base
-
-# Verify tables were dropped
-psql -h localhost -U postgres -d speech_to_text -c "\dt"
-
-# Re-apply migrations
-alembic upgrade head
-```
-
-#### 3. Production Deployment
-
-**Option A: Auto-migration (simpler, good for small teams)**
-- Set `AUTO_MIGRATE=true` in production environment
-- Migrations run automatically on container startup
-- Requires database backup strategy
-
-**Option B: Manual migration (safer, recommended for production)**
-- Set `AUTO_MIGRATE=false` in production environment
-- Run migrations manually during deployment:
-  ```bash
-  # SSH to production server or use CI/CD pipeline
-  alembic upgrade head
-  ```
-- Allows for verification before starting application
-- Better control over rollback procedures
-
-### Migration Best Practices
-
-1. **Always backup the database** before running migrations in production
-2. **Test migrations** on a staging environment first
-3. **Review migration scripts** before applying them
-4. **Use transactions** - Alembic uses transactions by default, but verify
-5. **Monitor migration execution** - especially for large tables
-6. **Plan for rollback** - ensure downgrade scripts are tested
-7. **Version control** - commit migration scripts to git
-8. **Document schema changes** - add comments to migration scripts
-
-### Troubleshooting
-
-#### Migration fails with "relation already exists"
-
-The table might already exist. Options:
-```bash
-# Option 1: Stamp the database with current revision (if tables are correct)
-alembic stamp head
-
-# Option 2: Drop all tables and re-run migrations
-alembic downgrade base
-alembic upgrade head
-```
-
-#### Cannot connect to database
-
-Check environment variables and network connectivity:
-```bash
-# Test PostgreSQL connection
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME
-
-# Or using pg_isready
-pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER
-```
-
-#### Migration hangs or times out
-
-- Check for locks: `SELECT * FROM pg_locks WHERE granted = false;`
-- Ensure no other processes are using the database
-- Increase timeout in alembic.ini if needed
-
-#### Rollback failed
-
-If downgrade fails, you may need to manually fix the database:
-```bash
-# Show current state
-alembic current
-
-# Show SQL without executing
-alembic downgrade -1 --sql
-
-# Manually execute SQL or fix issues, then stamp
-alembic stamp <revision>
-```
-
-### Schema Overview
-
-#### api_keys Table
-- Stores API authentication keys (SHA256 hashed)
-- Includes rate limiting and expiration support
-- Tracks last usage for monitoring
-
-#### lexicon_terms Table
-- Domain-specific terms (drug names, brand names, etc.)
-- Normalized terms for matching
-- Frequency tracking for learning
-- Supports alternatives and metadata
-
-#### jobs Table
-- Transcription job tracking
-- Audio file metadata
-- Processing status and timing
-- References api_keys for authentication
-
-#### feedback Table
-- Reviewer corrections and edits
-- Diff data for analysis
-- Accuracy scoring
-- Extracts new terms for lexicon
-- References jobs table (CASCADE delete)
-
-### Additional Resources
-
-- [Alembic Documentation](https://alembic.sqlalchemy.org/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-
-## Contributing
-
-When making schema changes:
-1. Update SQLAlchemy models (if applicable)
-2. Create a new migration: `alembic revision -m "description"`
-3. Update the migration script with upgrade/downgrade logic
-4. Test both upgrade and downgrade
-5. Document changes in migration comments
-6. Commit migration script to version control
+Check your network connection and OpenAI service status. The error message includes the last error encountered.
 
 ## License
 
-[Your License Here]
+This project is part of a speech-to-text prototype for client demos.
+
+## Support
+
+For issues or questions, please check:
+1. OpenAI API status: https://status.openai.com/
+2. OpenAI documentation: https://platform.openai.com/docs/guides/speech-to-text
+3. Project logs for detailed error messages

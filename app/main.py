@@ -139,6 +139,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register routers
+from app.routers import lexicons
+app.include_router(lexicons.router)
+
 
 @app.get("/")
 async def root():

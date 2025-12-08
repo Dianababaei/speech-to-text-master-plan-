@@ -50,6 +50,12 @@ class Settings(BaseSettings):
         "postgresql://user:password@db:5432/transcription"
     )
     
+    # Redis Configuration
+    REDIS_URL: str = os.getenv(
+        "REDIS_URL",
+        "redis://localhost:6379/0"
+    )
+    
     # OpenAI API Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "whisper-1")

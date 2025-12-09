@@ -10,27 +10,37 @@ from pydantic import BaseModel, Field, validator
 
 
 class TermCreate(BaseModel):
-    """Schema for creating a new lexicon term."""
+    """
+    Schema for creating a new lexicon term.
+    
+    Note: Additional validation (uniqueness, circular references, conflicts)
+    is performed by the lexicon_validator service after schema validation.
+    """
     
     term: str = Field(
         ..., 
         min_length=1, 
-        max_length=255,
-        description="The term to match in transcriptions"
+        max_length=200,  # Updated to match validator MAX_TERM_LENGTH
+        description="The term to match in transcriptions (1-200 characters)"
     )
     replacement: str = Field(
         ..., 
         min_length=1, 
-        max_length=255,
-        description="The corrected/replacement term"
+        max_length=500,  # Updated to match validator MAX_REPLACEMENT_LENGTH
+        description="The corrected/replacement term (1-500 characters)"
     )
     
     @validator('term', 'replacement')
-    def validate_non_empty(cls, v):
+    def validate_non_empty(cls, v, field):
         """Validate that strings are not just whitespace."""
         if not v or not v.strip():
-            raise ValueError("Field cannot be empty or whitespace only")
-        return v.strip()
+            raise ValueError(f"{field.name.capitalize()} cannot be empty or whitespace only")
+        # Return trimmed value
+        trimmed = v.strip()
+        if v != trimmed:
+            # Note: This trimming is informational; the validator service will also warn
+            pass
+        return trimmed
     
     class Config:
         schema_extra = {
@@ -42,27 +52,37 @@ class TermCreate(BaseModel):
 
 
 class TermUpdate(BaseModel):
-    """Schema for updating an existing lexicon term."""
+    """
+    Schema for updating an existing lexicon term.
+    
+    Note: Additional validation (uniqueness, circular references, conflicts)
+    is performed by the lexicon_validator service after schema validation.
+    """
     
     term: str = Field(
         ..., 
         min_length=1, 
-        max_length=255,
-        description="The term to match in transcriptions"
+        max_length=200,  # Updated to match validator MAX_TERM_LENGTH
+        description="The term to match in transcriptions (1-200 characters)"
     )
     replacement: str = Field(
         ..., 
         min_length=1, 
-        max_length=255,
-        description="The corrected/replacement term"
+        max_length=500,  # Updated to match validator MAX_REPLACEMENT_LENGTH
+        description="The corrected/replacement term (1-500 characters)"
     )
     
     @validator('term', 'replacement')
-    def validate_non_empty(cls, v):
+    def validate_non_empty(cls, v, field):
         """Validate that strings are not just whitespace."""
         if not v or not v.strip():
-            raise ValueError("Field cannot be empty or whitespace only")
-        return v.strip()
+            raise ValueError(f"{field.name.capitalize()} cannot be empty or whitespace only")
+        # Return trimmed value
+        trimmed = v.strip()
+        if v != trimmed:
+            # Note: This trimming is informational; the validator service will also warn
+            pass
+        return trimmed
     
     class Config:
         schema_extra = {

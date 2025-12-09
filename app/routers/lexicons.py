@@ -107,6 +107,8 @@ from app.schemas.lexicon import (
     TermListResponse
 )
 from app.services import lexicon_service
+from app.services.lexicon_validator import validate_term
+from app.services.lexicon_service import invalidate_lexicon_cache
 
 
 router = APIRouter(
@@ -150,7 +152,7 @@ def validate_lexicon_id(lexicon_id: str) -> str:
     response_model=TermResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Add new term to lexicon",
-    description="Create a new term in the specified lexicon with validation for uniqueness"
+    description="Create a new term in the specified lexicon with comprehensive validation"
 )
 async def create_term(
     lexicon_id: str = Path(..., description="Lexicon identifier (e.g., 'radiology', 'cardiology')"),
@@ -165,18 +167,44 @@ async def create_term(
     - **term**: The term to match in transcriptions
     - **replacement**: The corrected/replacement term
     
+    Validation includes:
+    - Format validation (length limits, no empty strings)
+    - Uniqueness check (case-insensitive)
+    - Circular replacement detection
+    - Conflict detection (overlapping terms)
+    
     Returns the created term with ID and timestamps.
     """
     # Validate lexicon_id format
     lexicon_id = validate_lexicon_id(lexicon_id)
     
+    # Comprehensive validation
+    validation_result = validate_term(
+        db=db,
+        lexicon_id=lexicon_id,
+        term=term_data.term,
+        replacement=term_data.replacement,
+        check_conflicts=True
+    )
+    
+    # Check for validation errors
+    if not validation_result.is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=validation_result.to_error_detail("Term validation failed")
+        )
+    
     try:
         # Create term using service
         new_term = lexicon_service.create_term(db, lexicon_id, term_data)
+        
+        # Invalidate cache for this lexicon to ensure fresh data
+        invalidate_lexicon_cache(lexicon_id)
+        
         return new_term
     
     except ValueError as e:
-        # Term already exists
+        # Term already exists (shouldn't happen due to validation, but keep as safety net)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e)
@@ -364,7 +392,7 @@ async def get_term(
     "/{lexicon_id}/terms/{term_id}",
     response_model=TermResponse,
     summary="Update existing term",
-    description="Update term and replacement text, updates timestamp automatically"
+    description="Update term and replacement text with comprehensive validation"
 )
 async def update_term(
     lexicon_id: str = Path(..., description="Lexicon identifier"),
@@ -381,10 +409,41 @@ async def update_term(
     - **term**: Updated term text
     - **replacement**: Updated replacement text
     
+    Validation includes:
+    - Format validation (length limits, no empty strings)
+    - Uniqueness check (case-insensitive, excluding current term)
+    - Circular replacement detection
+    - Conflict detection (overlapping terms)
+    
     Returns the updated term with new timestamp.
     """
     # Validate lexicon_id format
     lexicon_id = validate_lexicon_id(lexicon_id)
+    
+    # Check if term exists
+    existing_term = lexicon_service.get_term_by_id(db, lexicon_id, term_id)
+    if not existing_term:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
+        )
+    
+    # Comprehensive validation (exclude current term from uniqueness check)
+    validation_result = validate_term(
+        db=db,
+        lexicon_id=lexicon_id,
+        term=term_data.term,
+        replacement=term_data.replacement,
+        exclude_term_id=term_id,
+        check_conflicts=True
+    )
+    
+    # Check for validation errors
+    if not validation_result.is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=validation_result.to_error_detail("Term validation failed")
+        )
     
     try:
         # Update term using service
@@ -396,10 +455,13 @@ async def update_term(
                 detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
             )
         
+        # Invalidate cache for this lexicon to ensure fresh data
+        invalidate_lexicon_cache(lexicon_id)
+        
         return updated_term
     
     except ValueError as e:
-        # Term already exists (duplicate)
+        # Term already exists (shouldn't happen due to validation, but keep as safety net)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e)
@@ -448,6 +510,9 @@ async def delete_term(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
             )
+        
+        # Invalidate cache for this lexicon to ensure fresh data
+        invalidate_lexicon_cache(lexicon_id)
         
         # 204 No Content - no response body
         return None

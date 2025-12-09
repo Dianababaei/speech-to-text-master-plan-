@@ -24,7 +24,7 @@ from app.services.openai_service import (
     OpenAIAPIError,
 )
 from app.services.postprocessing_service import (
-    process_transcription,
+    create_pipeline,
     PostProcessingError,
 )
 from app.utils.database import db_session_context
@@ -460,7 +460,19 @@ def process_transcription_job(job_id: str) -> None:
         
         try:
             postproc_start = time()
-            processed_text = process_transcription(original_text, lexicon_id)
+            
+            # Create pipeline with default configuration
+            pipeline = create_pipeline()
+            
+            # Process with database session for lexicon lookup
+            with db_session_context() as session:
+                processed_text = pipeline.process(
+                    original_text,
+                    lexicon_id=lexicon_id,
+                    db=session,
+                    job_id=job_id
+                )
+            
             postproc_duration = time() - postproc_start
             
             log_with_context(

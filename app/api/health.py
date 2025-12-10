@@ -4,8 +4,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
 import redis
 from app.database import engine
-from app.main import redis_client
-from app.config.settings import settings
+from app.redis_client import redis_client
+from app.config.settings import get_settings
+
+settings = get_settings()
 import asyncio
 from concurrent.futures import TimeoutError
 import signal

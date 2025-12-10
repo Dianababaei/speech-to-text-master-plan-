@@ -102,6 +102,12 @@ data/
 # Audio storage
 audio_storage/
 
+# Transcription output files
+transcriptions/
+*.txt
+transcription_results.txt
+transcriptions.csv
+
 # Logs
 *.log
 

@@ -5,6 +5,7 @@ This module contains the main worker function that orchestrates the complete
 transcription workflow from job pickup to result storage.
 """
 import os
+import logging
 import traceback
 from pathlib import Path
 from time import time
@@ -29,29 +30,88 @@ from app.services.postprocessing_service import (
 )
 from app.utils.database import db_session_context
 from app.utils.logging import get_logger, log_with_context
-from app.config import TEMP_AUDIO_DIR
+from app.config.settings import get_settings
 
+settings = get_settings()
 logger = get_logger(__name__)
+
+
+def save_transcription_to_file(transcription_text: str, audio_filename: str, job_id: str) -> Optional[str]:
+    """
+    Save transcription to a text file in the transcriptions directory.
+
+    Args:
+        transcription_text: The transcription text to save
+        audio_filename: Original audio filename (e.g., "63148.mp3")
+        job_id: Job ID for logging context
+
+    Returns:
+        Path to saved file if successful, None otherwise
+    """
+    if not transcription_text:
+        log_with_context(
+            logger,
+            logging.WARNING,
+            f"No transcription text to save",
+            job_id=job_id
+        )
+        return None
+
+    try:
+        # Create transcriptions directory if it doesn't exist
+        transcriptions_dir = Path("transcriptions")
+        transcriptions_dir.mkdir(exist_ok=True)
+
+        # Generate filename: replace audio extension with .txt
+        # e.g., "63148.mp3" -> "63148.txt"
+        base_name = Path(audio_filename).stem
+        txt_filename = f"{base_name}.txt"
+        txt_path = transcriptions_dir / txt_filename
+
+        # Save transcription with UTF-8 encoding for Persian text
+        txt_path.write_text(transcription_text, encoding='utf-8')
+
+        log_with_context(
+            logger,
+            logging.INFO,
+            f"Transcription saved to file",
+            job_id=job_id,
+            file_path=str(txt_path),
+            audio_filename=audio_filename
+        )
+
+        return str(txt_path)
+
+    except Exception as e:
+        log_with_context(
+            logger,
+            logging.ERROR,
+            f"Failed to save transcription to file: {str(e)}",
+            job_id=job_id,
+            audio_filename=audio_filename,
+            error_type=type(e).__name__
+        )
+        return None
 
 
 def cleanup_audio_file(file_path: str, job_id: str) -> None:
     """
     Clean up temporary audio file with error handling.
-    
+
     Args:
         file_path: Path to audio file to delete
         job_id: Job ID for logging context
     """
     if not file_path:
         return
-    
+
     try:
         path = Path(file_path)
         if path.exists():
             path.unlink()
             log_with_context(
                 logger,
-                logger.INFO,
+                logging.INFO,
                 f"Audio file cleaned up successfully",
                 job_id=job_id,
                 file_path=file_path
@@ -59,7 +119,7 @@ def cleanup_audio_file(file_path: str, job_id: str) -> None:
         else:
             log_with_context(
                 logger,
-                logger.WARNING,
+                logging.WARNING,
                 f"Audio file not found for cleanup (may have been deleted already)",
                 job_id=job_id,
                 file_path=file_path
@@ -67,7 +127,7 @@ def cleanup_audio_file(file_path: str, job_id: str) -> None:
     except Exception as e:
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Error cleaning up audio file: {str(e)}",
             job_id=job_id,
             file_path=file_path,
@@ -96,7 +156,7 @@ def load_audio_file(file_path: str, job_id: str) -> Path:
     if not path.exists():
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Audio file not found",
             job_id=job_id,
             file_path=file_path
@@ -107,7 +167,7 @@ def load_audio_file(file_path: str, job_id: str) -> Path:
     if not os.access(path, os.R_OK):
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Audio file is not readable",
             job_id=job_id,
             file_path=file_path
@@ -119,7 +179,7 @@ def load_audio_file(file_path: str, job_id: str) -> Path:
     if path.suffix.lower() not in valid_extensions:
         log_with_context(
             logger,
-            logger.WARNING,
+            logging.WARNING,
             f"Audio file has unexpected extension: {path.suffix}",
             job_id=job_id,
             file_path=file_path
@@ -127,7 +187,7 @@ def load_audio_file(file_path: str, job_id: str) -> Path:
     
     log_with_context(
         logger,
-        logger.INFO,
+        logging.INFO,
         f"Audio file loaded and validated",
         job_id=job_id,
         file_path=file_path
@@ -161,25 +221,27 @@ def process_transcription_job(job_id: str) -> None:
     """
     start_time = time()
     audio_file_path = None
-    
+    audio_filename = None
+
     log_with_context(
         logger,
-        logger.INFO,
+        logging.INFO,
         f"Starting transcription job processing",
         job_id=job_id
     )
-    
+
     try:
         # Step 1: Fetch job from database
         with db_session_context() as session:
             try:
                 job = get_job(job_id, session=session)
-                audio_file_path = job.audio_file_path
-                lexicon_id = job.lexicon_id
+                audio_file_path = job.audio_storage_path
+                audio_filename = job.audio_filename
+                lexicon_id = getattr(job, 'lexicon_id', None)
                 
                 log_with_context(
                     logger,
-                    logger.INFO,
+                    logging.INFO,
                     f"Job loaded from database",
                     job_id=job_id,
                     status=job.status,
@@ -189,7 +251,7 @@ def process_transcription_job(job_id: str) -> None:
             except JobNotFoundError as e:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Job not found in database: {str(e)}",
                     job_id=job_id,
                     error_type="JobNotFoundError"
@@ -200,7 +262,7 @@ def process_transcription_job(job_id: str) -> None:
             except JobServiceError as e:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Database error loading job: {str(e)}",
                     job_id=job_id,
                     error_type="JobServiceError"
@@ -215,7 +277,7 @@ def process_transcription_job(job_id: str) -> None:
             
             log_with_context(
                 logger,
-                logger.INFO,
+                logging.INFO,
                 f"Job status updated to processing",
                 job_id=job_id,
                 status="processing"
@@ -224,7 +286,7 @@ def process_transcription_job(job_id: str) -> None:
         except (JobServiceError, JobNotFoundError) as e:
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 f"Failed to update job status to processing: {str(e)}",
                 job_id=job_id,
                 error_type=type(e).__name__
@@ -239,7 +301,7 @@ def process_transcription_job(job_id: str) -> None:
             error_msg = f"Audio file not found: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type="FileNotFoundError",
@@ -258,7 +320,7 @@ def process_transcription_job(job_id: str) -> None:
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -269,7 +331,7 @@ def process_transcription_job(job_id: str) -> None:
             error_msg = f"Invalid audio file: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type="ValueError",
@@ -288,7 +350,7 @@ def process_transcription_job(job_id: str) -> None:
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -306,7 +368,7 @@ def process_transcription_job(job_id: str) -> None:
             
             log_with_context(
                 logger,
-                logger.INFO,
+                logging.INFO,
                 f"OpenAI transcription completed",
                 job_id=job_id,
                 duration=transcription_duration
@@ -316,7 +378,7 @@ def process_transcription_job(job_id: str) -> None:
             error_msg = f"OpenAI quota exceeded: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type="OpenAIQuotaError"
@@ -334,7 +396,7 @@ def process_transcription_job(job_id: str) -> None:
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -347,7 +409,7 @@ def process_transcription_job(job_id: str) -> None:
             error_msg = f"OpenAI API error: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type="OpenAIAPIError"
@@ -365,7 +427,7 @@ def process_transcription_job(job_id: str) -> None:
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -378,7 +440,7 @@ def process_transcription_job(job_id: str) -> None:
             error_msg = f"OpenAI service error: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type="OpenAIServiceError"
@@ -396,7 +458,7 @@ def process_transcription_job(job_id: str) -> None:
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -405,33 +467,37 @@ def process_transcription_job(job_id: str) -> None:
             cleanup_audio_file(audio_file_path, job_id)
             return
         
-        # Step 5: Store original_text in database
+        # Step 5: Store transcription_text in database
         try:
             with db_session_context() as session:
                 update_job_status(
                     job_id,
                     "processing",
                     session=session,
-                    original_text=original_text
+                    transcription_text=original_text
                 )
-            
+
             log_with_context(
                 logger,
-                logger.INFO,
-                f"Original transcription text stored",
+                logging.INFO,
+                f"Transcription text stored in database",
                 job_id=job_id
             )
-        
+
+            # Step 5.5: Save transcription to text file
+            if audio_filename:
+                save_transcription_to_file(original_text, audio_filename, job_id)
+
         except (JobServiceError, JobNotFoundError) as e:
-            error_msg = f"Failed to store original_text: {str(e)}"
+            error_msg = f"Failed to store transcription_text: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type=type(e).__name__
             )
-            
+
             # Mark job as failed
             try:
                 with db_session_context() as session:
@@ -440,12 +506,12 @@ def process_transcription_job(job_id: str) -> None:
                         "failed",
                         session=session,
                         error_message=error_msg,
-                        original_text=original_text  # Try to save it anyway
+                        transcription_text=original_text  # Try to save it anyway
                     )
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -465,7 +531,7 @@ def process_transcription_job(job_id: str) -> None:
             
             log_with_context(
                 logger,
-                logger.INFO,
+                logging.INFO,
                 f"Post-processing completed",
                 job_id=job_id,
                 duration=postproc_duration
@@ -475,7 +541,7 @@ def process_transcription_job(job_id: str) -> None:
             # Post-processing failure is not fatal - we still have original_text
             log_with_context(
                 logger,
-                logger.WARNING,
+                logging.WARNING,
                 f"Post-processing failed, but original_text is valid: {str(e)}",
                 job_id=job_id,
                 error_type="PostProcessingError"
@@ -487,7 +553,7 @@ def process_transcription_job(job_id: str) -> None:
             # Unexpected post-processing error
             log_with_context(
                 logger,
-                logger.WARNING,
+                logging.WARNING,
                 f"Unexpected post-processing error: {str(e)}",
                 job_id=job_id,
                 error_type=type(e).__name__
@@ -495,21 +561,22 @@ def process_transcription_job(job_id: str) -> None:
             post_processing_failed = True
             processed_text = None
         
-        # Step 7: Store processed_text and update to completed
+        # Step 7: Update job to completed
+        # Note: transcription_text is already saved in Step 5
+        # Post-processing is not yet implemented, so processed_text is not used
         try:
             with db_session_context() as session:
                 update_job_status(
                     job_id,
                     "completed",
-                    session=session,
-                    processed_text=processed_text
+                    session=session
                 )
             
             total_duration = time() - start_time
             
             log_with_context(
                 logger,
-                logger.INFO,
+                logging.INFO,
                 f"Job completed successfully",
                 job_id=job_id,
                 status="completed",
@@ -519,7 +586,7 @@ def process_transcription_job(job_id: str) -> None:
             if post_processing_failed:
                 log_with_context(
                     logger,
-                    logger.WARNING,
+                    logging.WARNING,
                     f"Job completed with post-processing warning",
                     job_id=job_id
                 )
@@ -528,7 +595,7 @@ def process_transcription_job(job_id: str) -> None:
             error_msg = f"Failed to mark job as completed: {str(e)}"
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 error_msg,
                 job_id=job_id,
                 error_type=type(e).__name__
@@ -546,7 +613,7 @@ def process_transcription_job(job_id: str) -> None:
             except Exception as update_error:
                 log_with_context(
                     logger,
-                    logger.ERROR,
+                    logging.ERROR,
                     f"Failed to mark job as failed: {str(update_error)}",
                     job_id=job_id
                 )
@@ -557,7 +624,7 @@ def process_transcription_job(job_id: str) -> None:
         total_duration = time() - start_time
         log_with_context(
             logger,
-            logger.INFO,
+            logging.INFO,
             f"Job processing completed",
             job_id=job_id,
             duration=total_duration
@@ -571,7 +638,7 @@ def process_transcription_job(job_id: str) -> None:
         
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"{error_msg}\n{error_traceback}",
             job_id=job_id,
             error_type=type(e).__name__,
@@ -590,7 +657,7 @@ def process_transcription_job(job_id: str) -> None:
         except Exception as update_error:
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 f"Failed to mark job as failed after unexpected error: {str(update_error)}",
                 job_id=job_id
             )

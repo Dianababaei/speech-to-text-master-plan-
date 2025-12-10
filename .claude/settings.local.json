@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(curl:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(del \"c:\\Users\\digi kaj\\Desktop\\speech-to-text\\speech-to-text-master-plan-\\alembic\\versions\\a31f505721d6_fix_api_keys_schema.py\")",
+      "Bash(docker-compose restart:*)",
+      "Bash(python:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(timeout /t 45 /nobreak)",
+      "Bash(ping:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

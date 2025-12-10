@@ -1,43 +1,16 @@
 """
 Job management endpoints for the transcription API.
-
-Note: To ensure invalid UUID formats return 400 instead of 422, register the
-validation_exception_handler from app.api.exceptions in your FastAPI app:
-
-    from fastapi.exceptions import RequestValidationError
-    from app.api.exceptions import validation_exception_handler
-    
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
 """
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from app.schemas.jobs import JobStatusResponse, JobStatus
-
-# These imports assume the existence of database and authentication modules
-# as mentioned in the task dependencies
-try:
-    from app.db.session import get_db
-    from app.models.jobs import Job
-    from app.api.dependencies import get_api_key_id
-except ImportError:
-    # Fallback for development/testing - these should be implemented
-    # in the actual project based on task dependencies
-    def get_db():
-        """Placeholder for database session dependency."""
-        raise NotImplementedError("Database session dependency not implemented")
-    
-    class Job:
-        """Placeholder Job model."""
-        pass
-    
-    def get_api_key_id(x_api_key: str = Header(..., alias="X-API-Key")) -> int:
-        """Placeholder for API key authentication dependency."""
-        raise NotImplementedError("API key authentication not implemented")
-
+from app.models.job import Job
+from app.database import get_db
+from app.dependencies.auth import get_api_key_id
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -133,7 +106,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
     }
 )
 async def get_job_status(
-    job_id: Annotated[UUID, Path(description="Unique identifier of the job to retrieve")],
+    job_id: Annotated[str, Path(description="Unique identifier of the job to retrieve")],
     db: Annotated[Session, Depends(get_db)],
     api_key_id: Annotated[int, Depends(get_api_key_id)]
 ) -> JobStatusResponse:
@@ -176,24 +149,22 @@ async def get_job_status(
         )
     
     # Map database model to response schema with proper null handling
-    # For pending/processing jobs, original_text and processed_text should be null
+    # For pending/processing jobs, transcription_text should be null
     # For failed jobs, error_message should be populated
-    original_text = None
-    processed_text = None
+    transcription_text = None
     if job.status in [JobStatus.COMPLETED.value]:
-        original_text = job.original_text
-        processed_text = job.processed_text
-    
+        transcription_text = job.transcription_text
+
     error_message = None
     if job.status == JobStatus.FAILED.value:
         error_message = job.error_message
-    
+
     return JobStatusResponse(
         job_id=job.job_id,
         status=job.status,
         created_at=job.created_at,
         completed_at=job.completed_at,
-        original_text=original_text,
-        processed_text=processed_text,
+        original_text=transcription_text,  # Map to original_text for now
+        processed_text=transcription_text,  # Will be different after post-processing is implemented
         error_message=error_message
     )

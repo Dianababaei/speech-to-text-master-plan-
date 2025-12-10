@@ -1,6 +1,7 @@
 """
 Job service for managing transcription job status and metadata.
 """
+import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -44,12 +45,12 @@ def get_job(job_id: str, session: Optional[Session] = None) -> Job:
         close_session = True
     
     try:
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter(Job.job_id == job_id).first()
         
         if job is None:
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 f"Job not found in database",
                 job_id=job_id
             )
@@ -60,7 +61,7 @@ def get_job(job_id: str, session: Optional[Session] = None) -> Job:
     except SQLAlchemyError as e:
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Database error retrieving job: {str(e)}",
             job_id=job_id,
             error_type=type(e).__name__
@@ -112,12 +113,12 @@ def update_job_status(
     
     try:
         # Get the job
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter(Job.job_id == job_id).first()
         
         if job is None:
             log_with_context(
                 logger,
-                logger.ERROR,
+                logging.ERROR,
                 f"Job not found for status update",
                 job_id=job_id,
                 status=status
@@ -146,7 +147,7 @@ def update_job_status(
         
         log_with_context(
             logger,
-            logger.INFO,
+            logging.INFO,
             f"Job status updated: {old_status} -> {status}",
             job_id=job_id,
             status=status
@@ -165,7 +166,7 @@ def update_job_status(
         
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Database error updating job status: {str(e)}",
             job_id=job_id,
             status=status,
@@ -179,7 +180,7 @@ def update_job_status(
         
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Unexpected error updating job status: {str(e)}",
             job_id=job_id,
             status=status,
@@ -221,7 +222,7 @@ def update_job_fields(
         manage_transaction = True
     
     try:
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter(Job.job_id == job_id).first()
         
         if job is None:
             raise JobNotFoundError(f"Job with ID {job_id} not found")
@@ -237,7 +238,7 @@ def update_job_fields(
         
         log_with_context(
             logger,
-            logger.DEBUG,
+            logging.DEBUG,
             f"Job fields updated: {', '.join(fields.keys())}",
             job_id=job_id
         )
@@ -255,7 +256,7 @@ def update_job_fields(
         
         log_with_context(
             logger,
-            logger.ERROR,
+            logging.ERROR,
             f"Database error updating job fields: {str(e)}",
             job_id=job_id,
             error_type=type(e).__name__

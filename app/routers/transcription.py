@@ -9,7 +9,9 @@ from datetime import datetime
 from app.database import get_db
 from app.models import Job, APIKey
 from app.auth import get_api_key
-from app.config import settings
+from app.config.settings import get_settings
+
+settings = get_settings()
 
 
 router = APIRouter(prefix="", tags=["transcription"])

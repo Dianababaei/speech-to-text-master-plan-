@@ -35,11 +35,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from sqlalchemy.ext.declarative import declarative_base
 import uuid
 
-# Create a base class for declarative models
-Base = declarative_base()
+from app.database import Base
 
 
 class ApiKey(Base):
@@ -52,24 +50,25 @@ class ApiKey(Base):
     
     __tablename__ = "api_keys"
     
-    # Primary key - UUID for distributed system compatibility
+    # Primary key - Integer (matches database schema)
     id = Column(
-        UUID(as_uuid=True),
+        Integer,
         primary_key=True,
-        default=uuid.uuid4,
+        autoincrement=True,
         nullable=False,
         comment="Unique identifier for the API key record"
     )
-    
+
     # Hashed API key - never store plain text keys
     key_hash = Column(
         String(255),
         nullable=False,
         comment="Bcrypt/Argon2 hashed API key for secure storage"
     )
-    
-    # Project identification
+
+    # Project identification (mapped to 'name' column in database)
     project_name = Column(
+        'name',  # Maps to 'name' column in database
         String(255),
         nullable=False,
         comment="Human-readable project/application identifier"

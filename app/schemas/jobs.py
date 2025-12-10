@@ -1,5 +1,5 @@
 """
-Job response schemas for the transcription API.
+Job request and response schemas for the transcription API.
 """
 from datetime import datetime
 from enum import Enum
@@ -15,6 +15,23 @@ class JobStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class JobCreateResponse(BaseModel):
+    """Response model for job creation."""
+    job_id: UUID = Field(..., description="Unique identifier for the created job")
+    status: JobStatus = Field(..., description="Initial status (pending)")
+    created_at: datetime = Field(..., description="ISO 8601 timestamp when job was created")
+
+    class Config:
+        """Pydantic configuration."""
+        json_schema_extra = {
+            "example": {
+                "job_id": "123e4567-e89b-12d3-a456-426614174000",
+                "status": "pending",
+                "created_at": "2024-01-15T10:30:00Z"
+            }
+        }
 
 
 class JobStatusResponse(BaseModel):

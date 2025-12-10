@@ -18,6 +18,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis for Queue Management
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+
   # Web Application
   web:
     build: .
@@ -26,29 +39,34 @@ services:
       - .:/app
       - audio_storage:/app/audio_storage
     ports:
-      - "8000:8000"
+      - "8080:8000"
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/transcription
+      - REDIS_URL=redis://redis:6379/0
       - AUDIO_STORAGE_PATH=/app/audio_storage
       - AUDIO_RETENTION_HOURS=24
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=whisper-1
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
       - DEBUG=true
       - LOG_LEVEL=INFO
       - CLEANUP_INTERVAL_MINUTES=60
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # Worker for background tasks
   worker:
     build: .
-    command: python -m app.worker
+    command: rq worker transcription --url redis://redis:6379/0
     volumes:
       - .:/app
       - audio_storage:/app/audio_storage
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/transcription
+      - REDIS_URL=redis://redis:6379/0
       - AUDIO_STORAGE_PATH=/app/audio_storage
       - AUDIO_RETENTION_HOURS=24
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -58,9 +76,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   audio_storage:
     driver: local

@@ -4,10 +4,12 @@ Database session management utilities.
 from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from app.config import DATABASE_URL
+from app.config.settings import get_settings
+
+settings = get_settings()
 
 # Create engine
-engine = create_engine(DATABASE_URL, echo=False)
+engine = create_engine(settings.DATABASE_URL, echo=False)
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

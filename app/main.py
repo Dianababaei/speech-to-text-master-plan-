@@ -1,45 +1,3 @@
-from fastapi import FastAPI
-import redis
-from app.config.settings import settings
-from app.database import engine
-from app.api import health
-
-# Create FastAPI application
-app = FastAPI(
-    title="Speech-to-Text API",
-    description="Speech-to-text prototype with OpenAI API",
-    version="1.0.0"
-)
-
-# Initialize Redis connection pool
-redis_client = redis.from_url(
-    settings.REDIS_URL,
-    decode_responses=True,
-    socket_connect_timeout=settings.HEALTH_CHECK_TIMEOUT,
-    socket_timeout=settings.HEALTH_CHECK_TIMEOUT
-)
-
-# Register routers
-app.include_router(health.router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Startup event handler"""
-    print("Application starting up...")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown event handler"""
-    print("Application shutting down...")
-    redis_client.close()
-
-
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {"message": "Speech-to-Text API", "status": "running"}
 """
 Main FastAPI application entry point.
 
@@ -54,7 +12,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import get_settings
+from app.database import engine
 from app.services.storage import cleanup_old_audio_files, get_storage_stats
+from app.redis_client import redis_client
+from app.api import health, admin
+from app.api.endpoints import transcription, jobs
 
 # Configure logging
 settings = get_settings()
@@ -69,16 +31,16 @@ logger = logging.getLogger(__name__)
 async def cleanup_task():
     """Background task to periodically clean up old audio files."""
     from app.database import get_db
-    
+
     logger.info("Starting cleanup background task")
-    
+
     while True:
         try:
             # Wait for the configured interval
             await asyncio.sleep(settings.CLEANUP_INTERVAL_MINUTES * 60)
-            
+
             logger.info("Running scheduled audio file cleanup")
-            
+
             # Get database session
             db = next(get_db())
             try:
@@ -89,7 +51,7 @@ async def cleanup_task():
                 )
             finally:
                 db.close()
-                
+
         except asyncio.CancelledError:
             logger.info("Cleanup task cancelled")
             break
@@ -102,17 +64,17 @@ async def cleanup_task():
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
-    
+
     Starts the cleanup background task on startup and cancels it on shutdown.
     """
     # Startup
     logger.info("Starting application")
-    
+
     # Start the cleanup background task
     cleanup_task_handle = asyncio.create_task(cleanup_task())
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down application")
     cleanup_task_handle.cancel()
@@ -120,6 +82,9 @@ async def lifespan(app: FastAPI):
         await cleanup_task_handle
     except asyncio.CancelledError:
         pass
+
+    # Close Redis connection
+    redis_client.close()
 
 
 # Create FastAPI application
@@ -139,6 +104,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register routers
+app.include_router(health.router)
+app.include_router(transcription.router)
+app.include_router(jobs.router)
+app.include_router(admin.router)
+
 
 @app.get("/")
 async def root():
@@ -154,7 +125,7 @@ async def root():
 async def storage_stats():
     """
     Get storage statistics.
-    
+
     Returns information about disk usage and audio file storage.
     """
     try:
@@ -169,12 +140,12 @@ async def storage_stats():
 async def manual_cleanup():
     """
     Manually trigger audio file cleanup.
-    
+
     This endpoint allows administrators to manually trigger the cleanup
     process without waiting for the scheduled background task.
     """
     from app.database import get_db
-    
+
     try:
         logger.info("Manual cleanup triggered")
         db = next(get_db())
@@ -190,13 +161,6 @@ async def manual_cleanup():
     except Exception as e:
         logger.error(f"Error during manual cleanup: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
-
-
-# Health check endpoint (for the upcoming task)
-@app.get("/health")
-async def health_check():
-    """Basic health check endpoint."""
-    return {"status": "healthy"}
 
 
 if __name__ == "__main__":

@@ -6,7 +6,11 @@ import json
 import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
-from app.config import LOG_LEVEL, LOG_FORMAT
+from app.config.settings import get_settings
+
+settings = get_settings()
+LOG_LEVEL = settings.LOG_LEVEL
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 
 class StructuredFormatter(logging.Formatter):

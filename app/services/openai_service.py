@@ -6,11 +6,17 @@ The implementation here provides the interface that the worker expects.
 """
 from typing import Optional
 from pathlib import Path
-import openai
-from app.config import OPENAI_API_KEY, OPENAI_MODEL
+from io import BufferedReader
+from openai import OpenAI, APIError, RateLimitError, AuthenticationError
+from app.config.settings import get_settings
 from app.utils.logging import get_logger
 
+settings = get_settings()
 logger = get_logger(__name__)
+
+def get_openai_client():
+    """Get OpenAI client instance."""
+    return OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class OpenAIServiceError(Exception):
@@ -56,48 +62,51 @@ def transcribe_audio(
     
     try:
         logger.info(f"Starting OpenAI transcription for file: {audio_file_path}")
-        
-        # Configure OpenAI
-        openai.api_key = OPENAI_API_KEY
-        
-        # Open and transcribe audio file
-        with open(audio_file_path, "rb") as audio_file:
-            # Prepare API call parameters
-            kwargs = {
-                "model": OPENAI_MODEL,
-                "file": audio_file,
-            }
-            
-            if language:
-                kwargs["language"] = language
-            if prompt:
-                kwargs["prompt"] = prompt
-            
-            # Call OpenAI Whisper API
-            response = openai.Audio.transcribe(**kwargs)
-        
+
+        # Get OpenAI client
+        client = get_openai_client()
+
+        # Open and transcribe audio file - use Path directly
+        # The OpenAI SDK handles Path objects correctly
+        kwargs = {
+            "model": getattr(settings, 'OPENAI_MODEL', 'whisper-1'),
+            "file": open(audio_file_path, "rb"),
+        }
+
+        if language:
+            kwargs["language"] = language
+        if prompt:
+            kwargs["prompt"] = prompt
+
+        # Call OpenAI Whisper API (new v1.0+ API)
+        try:
+            response = client.audio.transcriptions.create(**kwargs)
+        finally:
+            # Close the file handle
+            kwargs["file"].close()
+
         # Extract transcription text
-        transcription = response.get("text", "")
-        
+        transcription = response.text
+
         logger.info(
             f"OpenAI transcription completed successfully. "
             f"Length: {len(transcription)} characters"
         )
-        
+
         return transcription
-    
-    except openai.error.RateLimitError as e:
+
+    except RateLimitError as e:
         logger.error(f"OpenAI rate limit exceeded: {str(e)}")
         raise OpenAIQuotaError(f"OpenAI quota exceeded: {str(e)}")
-    
-    except openai.error.APIError as e:
+
+    except APIError as e:
         logger.error(f"OpenAI API error: {str(e)}")
         raise OpenAIAPIError(f"OpenAI API error: {str(e)}")
-    
-    except openai.error.AuthenticationError as e:
+
+    except AuthenticationError as e:
         logger.error(f"OpenAI authentication error: {str(e)}")
         raise OpenAIAPIError(f"OpenAI authentication failed: {str(e)}")
-    
+
     except Exception as e:
         logger.error(f"Unexpected error during transcription: {str(e)}")
         raise OpenAIAPIError(f"Transcription failed: {str(e)}")

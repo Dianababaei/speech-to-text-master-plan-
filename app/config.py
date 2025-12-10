@@ -30,3 +30,39 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "whisper-1")
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FORMAT = "json"  # or "text"
+
+# Lexicon configuration
+DEFAULT_LEXICON = os.getenv("DEFAULT_LEXICON", "general")
+LEXICON_CACHE_TTL = int(os.getenv("LEXICON_CACHE_TTL", "3600"))  # 1 hour default
+
+# Post-processing pipeline configuration
+# Each step can be enabled/disabled via environment variables
+ENABLE_LEXICON_REPLACEMENT = os.getenv("ENABLE_LEXICON_REPLACEMENT", "true").lower() in ("true", "1", "yes")
+ENABLE_TEXT_CLEANUP = os.getenv("ENABLE_TEXT_CLEANUP", "true").lower() in ("true", "1", "yes")
+ENABLE_NUMERAL_HANDLING = os.getenv("ENABLE_NUMERAL_HANDLING", "true").lower() in ("true", "1", "yes")
+
+# Settings object for backward compatibility
+class _Settings:
+    """Simple settings object for access to configuration values."""
+    
+    @property
+    def default_lexicon(self):
+        return DEFAULT_LEXICON
+    
+    @property
+    def lexicon_cache_ttl(self):
+        return LEXICON_CACHE_TTL
+    
+    @property
+    def enable_lexicon_replacement(self):
+        return ENABLE_LEXICON_REPLACEMENT
+    
+    @property
+    def enable_text_cleanup(self):
+        return ENABLE_TEXT_CLEANUP
+    
+    @property
+    def enable_numeral_handling(self):
+        return ENABLE_NUMERAL_HANDLING
+
+settings = _Settings()

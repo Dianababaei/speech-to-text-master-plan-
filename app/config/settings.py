@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     # Health check timeout
     HEALTH_CHECK_TIMEOUT: int = 5
 
+    # Lexicon Configuration
+    DEFAULT_LEXICON: str = "general"
+    LEXICON_CACHE_TTL: int = 3600  # 1 hour default
+
+    # Numeral Handling Configuration
+    DEFAULT_NUMERAL_STRATEGY: str = "english"
+
     class Config:
         """Pydantic configuration."""
         case_sensitive = True

@@ -25,7 +25,7 @@ from app.services.openai_service import (
     OpenAIAPIError,
 )
 from app.services.postprocessing_service import (
-    process_transcription,
+    create_pipeline,
     PostProcessingError,
 )
 from app.utils.database import db_session_context
@@ -522,13 +522,24 @@ def process_transcription_job(job_id: str) -> None:
         
         # Step 6: Trigger post-processing pipeline
         processed_text = None
-        post_processing_failed = False
-        
+
         try:
             postproc_start = time()
-            processed_text = process_transcription(original_text, lexicon_id)
+
+            # Create pipeline with default configuration
+            pipeline = create_pipeline()
+
+            # Process with database session for lexicon lookup
+            with db_session_context() as session:
+                processed_text = pipeline.process(
+                    original_text,
+                    lexicon_id=lexicon_id,
+                    db=session,
+                    job_id=job_id
+                )
+
             postproc_duration = time() - postproc_start
-            
+
             log_with_context(
                 logger,
                 logging.INFO,
@@ -536,7 +547,17 @@ def process_transcription_job(job_id: str) -> None:
                 job_id=job_id,
                 duration=postproc_duration
             )
-        
+
+            # If post-processing returns None or empty string, fall back to original
+            if not processed_text:
+                log_with_context(
+                    logger,
+                    logging.WARNING,
+                    f"Post-processing returned empty result, using original_text",
+                    job_id=job_id
+                )
+                processed_text = original_text
+
         except PostProcessingError as e:
             # Post-processing failure is not fatal - we still have original_text
             log_with_context(
@@ -546,20 +567,19 @@ def process_transcription_job(job_id: str) -> None:
                 job_id=job_id,
                 error_type="PostProcessingError"
             )
-            post_processing_failed = True
-            processed_text = None  # No processed text available
-        
+            processed_text = original_text
+
         except Exception as e:
             # Unexpected post-processing error
             log_with_context(
                 logger,
-                logging.WARNING,
-                f"Unexpected post-processing error: {str(e)}",
+                logging.ERROR,
+                f"Unexpected post-processing error: {str(e)}. Falling back to original_text",
                 job_id=job_id,
                 error_type=type(e).__name__
             )
-            post_processing_failed = True
-            processed_text = None
+            # Fall back to original text
+            processed_text = original_text
         
         # Step 7: Update job to completed
         # Note: transcription_text is already saved in Step 5
@@ -582,15 +602,7 @@ def process_transcription_job(job_id: str) -> None:
                 status="completed",
                 duration=total_duration
             )
-            
-            if post_processing_failed:
-                log_with_context(
-                    logger,
-                    logging.WARNING,
-                    f"Job completed with post-processing warning",
-                    job_id=job_id
-                )
-        
+
         except (JobServiceError, JobNotFoundError) as e:
             error_msg = f"Failed to mark job as completed: {str(e)}"
             log_with_context(

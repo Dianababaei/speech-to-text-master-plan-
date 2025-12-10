@@ -9,6 +9,8 @@ import logging
 from typing import List, Dict, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
+from sqlalchemy import func, and_
+import redis
 from sqlalchemy import func
 
 from app.models.lexicon_term import LexiconTerm

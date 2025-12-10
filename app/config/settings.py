@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     DEFAULT_LEXICON: str = os.getenv("DEFAULT_LEXICON", "general")
     LEXICON_CACHE_TTL: int = int(os.getenv("LEXICON_CACHE_TTL", "3600"))  # 1 hour default
     
+    # Numeral Handling Configuration
+    DEFAULT_NUMERAL_STRATEGY: str = os.getenv("DEFAULT_NUMERAL_STRATEGY", "english")
+    
     # Redis Configuration
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     

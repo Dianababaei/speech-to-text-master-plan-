@@ -102,6 +102,88 @@ router = APIRouter(
         }
     }
 )
+async def list_lexicons(
+    db: Session = Depends(get_db)
+) -> LexiconListResponse:
+    """
+    Get all available lexicons with metadata.
+    
+    Args:
+        db: Database session (injected)
+    
+    Returns:
+        LexiconListResponse: List of lexicons with metadata
+    """
+    try:
+        logger.info("Fetching all lexicons")
+        lexicons = get_all_lexicons(db, use_cache=True)
+        
+        logger.info(f"Returning {len(lexicons)} lexicons")
+        return LexiconListResponse(lexicons=lexicons)
+        
+    except Exception as e:
+        logger.error(f"Error fetching lexicons: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve lexicons"
+from app.models.api_key import ApiKey
+from app.schemas.lexicon import (
+    TermCreate, 
+    TermUpdate, 
+    TermResponse, 
+    TermListResponse
+)
+from app.services import lexicon_service
+from app.services.lexicon_validator import validate_term
+from app.services.lexicon_service import invalidate_lexicon_cache
+
+
+router = APIRouter(
+    prefix="/lexicons",
+    tags=["lexicons"],
+    dependencies=[Depends(get_api_key)]
+)
+
+
+def validate_lexicon_id(lexicon_id: str) -> str:
+    """
+    Validate lexicon_id format.
+    
+    Args:
+        lexicon_id: The lexicon identifier to validate
+    
+    Returns:
+        str: The validated lexicon_id
+    
+    Raises:
+        HTTPException: If lexicon_id is invalid
+    """
+    # Alphanumeric and hyphens/underscores only, max 100 chars
+    if not lexicon_id or len(lexicon_id) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Lexicon ID must be between 1 and 100 characters"
+        )
+    
+    if not re.match(r'^[a-zA-Z0-9_-]+$', lexicon_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Lexicon ID must contain only alphanumeric characters, hyphens, and underscores"
+        )
+    
+    return lexicon_id
+
+
+@router.post(
+    "/{lexicon_id}/terms",
+    response_model=TermResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add new term to lexicon",
+    description="Create a new term in the specified lexicon with comprehensive validation"
+)
+async def create_term(
+    lexicon_id: str = Path(..., description="Lexicon identifier (e.g., 'radiology', 'cardiology')"),
+    term_data: TermCreate = ...,
 async def import_lexicon_terms(
     lexicon_id: str,
     file: UploadFile = File(..., description="JSON or CSV file containing lexicon terms"),
@@ -111,11 +193,49 @@ async def import_lexicon_terms(
     """
     Import lexicon terms from an uploaded file.
     
+    Validation includes:
+    - Format validation (length limits, no empty strings)
+    - Uniqueness check (case-insensitive)
+    - Circular replacement detection
+    - Conflict detection (overlapping terms)
+    
+    Returns the created term with ID and timestamps.
     Validates the file format, checks for duplicates and conflicts,
     and imports all valid terms in an atomic transaction.
     """
     logger.info(f"Import request for lexicon '{lexicon_id}' with file '{file.filename}'")
     
+    # Comprehensive validation
+    validation_result = validate_term(
+        db=db,
+        lexicon_id=lexicon_id,
+        term=term_data.term,
+        replacement=term_data.replacement,
+        check_conflicts=True
+    )
+    
+    # Check for validation errors
+    if not validation_result.is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=validation_result.to_error_detail("Term validation failed")
+        )
+    
+    try:
+        # Create term using service
+        new_term = lexicon_service.create_term(db, lexicon_id, term_data)
+        
+        # Invalidate cache for this lexicon to ensure fresh data
+        invalidate_lexicon_cache(lexicon_id)
+        
+        return new_term
+    
+    except ValueError as e:
+        # Term already exists (shouldn't happen due to validation, but keep as safety net)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
     # Validate file size
     await validate_file_size(file)
     
@@ -204,6 +324,102 @@ async def import_lexicon_terms(
 )
 async def export_lexicon_terms(
     lexicon_id: str,
+    db: Session = Depends(get_db)
+) -> LexiconDetailResponse:
+    """
+    Get metadata for a specific lexicon.
+    
+    Args:
+        lexicon_id: Unique lexicon identifier (e.g., "radiology")
+        db: Database session (injected)
+    
+    Returns:
+        LexiconDetailResponse: Lexicon metadata
+    
+    Raises:
+        HTTPException: 404 if lexicon not found or has no active terms
+    """
+    try:
+        logger.info(f"Fetching lexicon: {lexicon_id}")
+        lexicon = get_lexicon_by_id(db, lexicon_id, use_cache=True)
+        
+        if not lexicon:
+            logger.warning(f"Lexicon not found: {lexicon_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lexicon '{lexicon_id}' not found or has no active terms"
+            )
+        
+        logger.info(f"Returning lexicon {lexicon_id} with {lexicon.term_count} terms")
+        return LexiconDetailResponse(
+            lexicon_id=lexicon.lexicon_id,
+            term_count=lexicon.term_count,
+            last_updated=lexicon.last_updated,
+            description=lexicon.description
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching lexicon {lexicon_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve lexicon '{lexicon_id}'"
+    "/{lexicon_id}/terms/{term_id}",
+    response_model=TermResponse,
+    summary="Get specific term details",
+    description="Retrieve full details of a specific term by ID"
+)
+async def get_term(
+    lexicon_id: str = Path(..., description="Lexicon identifier"),
+    term_id: int = Path(..., ge=1, description="Term ID"),
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_api_key)
+):
+    """
+    Get details of a specific term.
+    
+    - **lexicon_id**: Identifier for the lexicon
+    - **term_id**: Unique identifier of the term
+    
+    Returns full term object including metadata.
+    """
+    # Validate lexicon_id format
+    lexicon_id = validate_lexicon_id(lexicon_id)
+    
+    try:
+        # Get term using service
+        term = lexicon_service.get_term_by_id(db, lexicon_id, term_id)
+        
+        if not term:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
+            )
+        
+        return term
+    
+    except HTTPException:
+        raise
+    
+    except Exception as e:
+        # Internal server error
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve term: {str(e)}"
+        )
+
+
+@router.put(
+    "/{lexicon_id}/terms/{term_id}",
+    response_model=TermResponse,
+    summary="Update existing term",
+    description="Update term and replacement text with comprehensive validation"
+)
+async def update_term(
+    lexicon_id: str = Path(..., description="Lexicon identifier"),
+    term_id: int = Path(..., ge=1, description="Term ID"),
+    term_data: TermUpdate = ...,
     format: ExportFormat = Query(
         ExportFormat.JSON, 
         description="Export format: 'json' or 'csv'"
@@ -214,6 +430,18 @@ async def export_lexicon_terms(
     """
     Export all active lexicon terms in the specified format.
     
+    - **lexicon_id**: Identifier for the lexicon
+    - **term_id**: Unique identifier of the term to update
+    - **term**: Updated term text
+    - **replacement**: Updated replacement text
+    
+    Validation includes:
+    - Format validation (length limits, no empty strings)
+    - Uniqueness check (case-insensitive, excluding current term)
+    - Circular replacement detection
+    - Conflict detection (overlapping terms)
+    
+    Returns the updated term with new timestamp.
     Returns a file download response with appropriate headers.
     """
     logger.info(f"Export request for lexicon '{lexicon_id}' in format '{format}'")

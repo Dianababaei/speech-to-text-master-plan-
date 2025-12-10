@@ -31,17 +31,19 @@ class StructuredFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
         
-        # Add extra fields from record
-        if hasattr(record, "job_id"):
-            log_data["job_id"] = record.job_id
-        if hasattr(record, "status"):
-            log_data["status"] = record.status
-        if hasattr(record, "duration"):
-            log_data["duration"] = record.duration
-        if hasattr(record, "error_type"):
-            log_data["error_type"] = record.error_type
-        if hasattr(record, "file_path"):
-            log_data["file_path"] = record.file_path
+        # Add all extra fields from record dynamically
+        # Standard fields to exclude from extras
+        standard_fields = {
+            'name', 'msg', 'args', 'created', 'filename', 'funcName', 
+            'levelname', 'levelno', 'lineno', 'module', 'msecs', 'message',
+            'pathname', 'process', 'processName', 'relativeCreated', 'thread',
+            'threadName', 'exc_info', 'exc_text', 'stack_info', 'asctime'
+        }
+        
+        # Add custom fields from extra parameter
+        for key, value in record.__dict__.items():
+            if key not in standard_fields and not key.startswith('_'):
+                log_data[key] = value
             
         # Add exception info if present
         if record.exc_info:
@@ -68,15 +70,22 @@ class TextFormatter(logging.Formatter):
         base_msg = super().format(record)
         
         # Add extra context if available
+        # Standard fields to exclude from extras
+        standard_fields = {
+            'name', 'msg', 'args', 'created', 'filename', 'funcName', 
+            'levelname', 'levelno', 'lineno', 'module', 'msecs', 'message',
+            'pathname', 'process', 'processName', 'relativeCreated', 'thread',
+            'threadName', 'exc_info', 'exc_text', 'stack_info', 'asctime'
+        }
+        
         extras = []
-        if hasattr(record, "job_id"):
-            extras.append(f"job_id={record.job_id}")
-        if hasattr(record, "status"):
-            extras.append(f"status={record.status}")
-        if hasattr(record, "duration"):
-            extras.append(f"duration={record.duration:.2f}s")
-        if hasattr(record, "error_type"):
-            extras.append(f"error_type={record.error_type}")
+        for key, value in record.__dict__.items():
+            if key not in standard_fields and not key.startswith('_'):
+                # Format duration specially
+                if 'duration' in key.lower() and isinstance(value, (int, float)):
+                    extras.append(f"{key}={value:.3f}s")
+                else:
+                    extras.append(f"{key}={value}")
             
         if extras:
             base_msg += f" [{', '.join(extras)}]"

@@ -456,11 +456,14 @@ def process_transcription_job(job_id: str) -> None:
         
         # Step 6: Trigger post-processing pipeline
         processed_text = None
-        post_processing_failed = False
         
         try:
             postproc_start = time()
             
+            # Pass db session and job_id for comprehensive error handling and logging
+            with db_session_context() as session:
+                processed_text = process_transcription(
+                    original_text, 
             # Create pipeline with default configuration
             pipeline = create_pipeline()
             
@@ -482,30 +485,29 @@ def process_transcription_job(job_id: str) -> None:
                 job_id=job_id,
                 duration=postproc_duration
             )
-        
-        except PostProcessingError as e:
-            # Post-processing failure is not fatal - we still have original_text
-            log_with_context(
-                logger,
-                logger.WARNING,
-                f"Post-processing failed, but original_text is valid: {str(e)}",
-                job_id=job_id,
-                error_type="PostProcessingError"
-            )
-            post_processing_failed = True
-            processed_text = None  # No processed text available
+            
+            # If post-processing returns None or empty string, fall back to original
+            if not processed_text:
+                log_with_context(
+                    logger,
+                    logger.WARNING,
+                    f"Post-processing returned empty result, using original_text",
+                    job_id=job_id
+                )
+                processed_text = original_text
         
         except Exception as e:
-            # Unexpected post-processing error
+            # This should rarely happen since process_transcription now handles all errors
+            # But we keep this as a safety net
             log_with_context(
                 logger,
-                logger.WARNING,
-                f"Unexpected post-processing error: {str(e)}",
+                logger.ERROR,
+                f"Unexpected post-processing error: {str(e)}. Falling back to original_text",
                 job_id=job_id,
                 error_type=type(e).__name__
             )
-            post_processing_failed = True
-            processed_text = None
+            # Fall back to original text
+            processed_text = original_text
         
         # Step 7: Store processed_text and update to completed
         try:
@@ -527,14 +529,6 @@ def process_transcription_job(job_id: str) -> None:
                 status="completed",
                 duration=total_duration
             )
-            
-            if post_processing_failed:
-                log_with_context(
-                    logger,
-                    logger.WARNING,
-                    f"Job completed with post-processing warning",
-                    job_id=job_id
-                )
         
         except (JobServiceError, JobNotFoundError) as e:
             error_msg = f"Failed to mark job as completed: {str(e)}"

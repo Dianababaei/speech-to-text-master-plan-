@@ -1,463 +1,246 @@
 """
-Lexicon Discovery Router
+API endpoints for lexicon import/export operations.
 
-This module provides REST API endpoints for browsing available lexicons
-and retrieving metadata about domain-specific terminology collections.
+Provides REST endpoints to import terms from JSON/CSV files and export
+terms in JSON/CSV formats.
 """
 
 import logging
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-Lexicon Router
-
-REST API endpoints for managing lexicon terms within specific lexicons.
-"""
-
-import re
+from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    File, 
+    UploadFile, 
+    HTTPException, 
+    status,
+    Query
+)
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.database import get_db
 from app.auth import get_api_key
-from app.models.lexicon import LexiconListResponse, LexiconDetailResponse, LexiconMetadata
-from app.services.lexicon_service import get_all_lexicons, get_lexicon_by_id
+from app.database import get_db
+from app.schemas.lexicons import (
+    ImportSummaryResponse,
+    ExportFormat,
+    ErrorDetail
+)
+from app.services.lexicon_service import (
+    validate_terms_for_import,
+    import_terms_to_database,
+    export_terms_from_database
+)
+from app.utils.file_parsers import (
+    validate_file_size,
+    parse_json_file,
+    parse_csv_file,
+    generate_json_export,
+    generate_csv_export
+)
 
 logger = logging.getLogger(__name__)
 
-# Create router with authentication dependency
 router = APIRouter(
     prefix="/lexicons",
-    tags=["lexicons"],
-    dependencies=[Depends(get_api_key)],  # Apply authentication to all endpoints
+    tags=["Lexicons"],
+    dependencies=[Depends(get_api_key)]  # Require authentication for all endpoints
 )
-
-
-@router.get(
-    "",
-    response_model=LexiconListResponse,
-    summary="List all available lexicons",
-    description="""
-    Retrieve metadata for all available domain-specific lexicons.
-    
-    Returns an array of lexicon objects, each containing:
-    - `lexicon_id`: Unique identifier (e.g., "radiology", "cardiology", "general")
-    - `term_count`: Number of active terms in the lexicon
-    - `last_updated`: Timestamp of most recent term modification
-    - `description`: Human-readable description
-    
-    Results are cached for 10 minutes to optimize performance.
-    """,
-    responses={
-        200: {
-            "description": "List of available lexicons with metadata",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "lexicons": [
-                            {
-                                "lexicon_id": "radiology",
-                                "term_count": 150,
-                                "last_updated": "2024-01-15T10:30:00Z",
-                                "description": "Medical radiology terminology"
-                            },
-                            {
-                                "lexicon_id": "cardiology",
-                                "term_count": 89,
-                                "last_updated": "2024-01-14T08:15:00Z",
-                                "description": "Cardiovascular and cardiac terminology"
-                            }
-                        ]
-                    }
-                }
-            }
-        },
-        401: {"description": "Authentication failed - invalid or missing API key"}
-    }
-)
-async def list_lexicons(
-    db: Session = Depends(get_db)
-) -> LexiconListResponse:
-    """
-    Get all available lexicons with metadata.
-    
-    Args:
-        db: Database session (injected)
-    
-    Returns:
-        LexiconListResponse: List of lexicons with metadata
-    """
-    try:
-        logger.info("Fetching all lexicons")
-        lexicons = get_all_lexicons(db, use_cache=True)
-        
-        logger.info(f"Returning {len(lexicons)} lexicons")
-        return LexiconListResponse(lexicons=lexicons)
-        
-    except Exception as e:
-        logger.error(f"Error fetching lexicons: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve lexicons"
-from app.models.api_key import ApiKey
-from app.schemas.lexicon import (
-    TermCreate, 
-    TermUpdate, 
-    TermResponse, 
-    TermListResponse
-)
-from app.services import lexicon_service
-
-
-router = APIRouter(
-    prefix="/lexicons",
-    tags=["lexicons"],
-    dependencies=[Depends(get_api_key)]
-)
-
-
-def validate_lexicon_id(lexicon_id: str) -> str:
-    """
-    Validate lexicon_id format.
-    
-    Args:
-        lexicon_id: The lexicon identifier to validate
-    
-    Returns:
-        str: The validated lexicon_id
-    
-    Raises:
-        HTTPException: If lexicon_id is invalid
-    """
-    # Alphanumeric and hyphens/underscores only, max 100 chars
-    if not lexicon_id or len(lexicon_id) > 100:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Lexicon ID must be between 1 and 100 characters"
-        )
-    
-    if not re.match(r'^[a-zA-Z0-9_-]+$', lexicon_id):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Lexicon ID must contain only alphanumeric characters, hyphens, and underscores"
-        )
-    
-    return lexicon_id
 
 
 @router.post(
-    "/{lexicon_id}/terms",
-    response_model=TermResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Add new term to lexicon",
-    description="Create a new term in the specified lexicon with validation for uniqueness"
-)
-async def create_term(
-    lexicon_id: str = Path(..., description="Lexicon identifier (e.g., 'radiology', 'cardiology')"),
-    term_data: TermCreate = ...,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(get_api_key)
-):
-    """
-    Add a new term to a lexicon.
-    
-    - **lexicon_id**: Identifier for the lexicon (alphanumeric, hyphens, underscores)
-    - **term**: The term to match in transcriptions
-    - **replacement**: The corrected/replacement term
-    
-    Returns the created term with ID and timestamps.
-    """
-    # Validate lexicon_id format
-    lexicon_id = validate_lexicon_id(lexicon_id)
-    
-    try:
-        # Create term using service
-        new_term = lexicon_service.create_term(db, lexicon_id, term_data)
-        return new_term
-    
-    except ValueError as e:
-        # Term already exists
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
-    
-    except Exception as e:
-        # Internal server error
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create term: {str(e)}"
-        )
-
-
-@router.get(
-    "/{lexicon_id}/terms",
-    response_model=TermListResponse,
-    summary="List all terms in lexicon",
-    description="Get paginated list of active terms in the specified lexicon"
-)
-async def list_terms(
-    lexicon_id: str = Path(..., description="Lexicon identifier"),
-    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
-    limit: int = Query(50, ge=1, le=100, description="Items per page (max 100)"),
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(get_api_key)
-):
-    """
-    List all active terms in a lexicon with pagination.
-    
-    - **lexicon_id**: Identifier for the lexicon
-    - **page**: Page number (default: 1)
-    - **limit**: Items per page (default: 50, max: 100)
-    
-    Returns paginated list of terms with total count.
-    """
-    # Validate lexicon_id format
-    lexicon_id = validate_lexicon_id(lexicon_id)
-    
-    try:
-        # Get terms using service
-        terms, total = lexicon_service.get_terms(db, lexicon_id, page, limit)
-        
-        return TermListResponse(
-            items=terms,
-            total=total,
-            page=page,
-            limit=limit
-        )
-    
-    except Exception as e:
-        # Internal server error
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve terms: {str(e)}"
-        )
-
-
-@router.get(
-    "/{lexicon_id}",
-    response_model=LexiconDetailResponse,
-    summary="Get specific lexicon metadata",
+    "/{lexicon_id}/import",
+    response_model=ImportSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Import lexicon terms from file",
     description="""
-    Retrieve detailed metadata for a specific lexicon by its ID.
+    Import lexicon terms from a JSON or CSV file.
     
-    Returns the same metadata fields as the list endpoint, but for a single lexicon.
+    **Supported Formats:**
+    - **JSON**: Array of objects with 'term' and 'replacement' fields
+      ```json
+      [
+        {"term": "CT scan", "replacement": "computed tomography"},
+        {"term": "MRI", "replacement": "magnetic resonance imaging"}
+      ]
+      ```
+    - **CSV**: Two columns with header row (term, replacement)
+      ```csv
+      term,replacement
+      CT scan,computed tomography
+      MRI,magnetic resonance imaging
+      ```
     
-    Results are cached for 10 minutes to optimize performance.
+    **Validation:**
+    - File size must not exceed 10MB
+    - All terms must have non-empty term and replacement values
+    - Duplicate terms within the file are skipped
+    - Terms that already exist in the lexicon (case-insensitive) are skipped
+    
+    **Import Behavior:**
+    - Import is atomic: all valid terms are imported or none (on error)
+    - Skipped terms are reported in the response with reasons
+    - Returns summary with counts of imported and skipped terms
     """,
     responses={
         200: {
-            "description": "Lexicon metadata",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "lexicon_id": "radiology",
-                        "term_count": 150,
-                        "last_updated": "2024-01-15T10:30:00Z",
-                        "description": "Medical radiology terminology"
-                    }
-                }
-            }
+            "description": "Import completed successfully",
+            "model": ImportSummaryResponse
         },
-        404: {
-            "description": "Lexicon not found or has no active terms",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Lexicon 'unknown' not found or has no active terms"
-                    }
-                }
-            }
+        400: {
+            "description": "Invalid file format or validation error",
+            "model": ErrorDetail
         },
-        401: {"description": "Authentication failed - invalid or missing API key"}
+        401: {
+            "description": "Missing or invalid API key",
+            "model": ErrorDetail
+        },
+        413: {
+            "description": "File size exceeds maximum (10MB)",
+            "model": ErrorDetail
+        }
     }
 )
-async def get_lexicon(
+async def import_lexicon_terms(
     lexicon_id: str,
-    db: Session = Depends(get_db)
-) -> LexiconDetailResponse:
-    """
-    Get metadata for a specific lexicon.
-    
-    Args:
-        lexicon_id: Unique lexicon identifier (e.g., "radiology")
-        db: Database session (injected)
-    
-    Returns:
-        LexiconDetailResponse: Lexicon metadata
-    
-    Raises:
-        HTTPException: 404 if lexicon not found or has no active terms
-    """
-    try:
-        logger.info(f"Fetching lexicon: {lexicon_id}")
-        lexicon = get_lexicon_by_id(db, lexicon_id, use_cache=True)
-        
-        if not lexicon:
-            logger.warning(f"Lexicon not found: {lexicon_id}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Lexicon '{lexicon_id}' not found or has no active terms"
-            )
-        
-        logger.info(f"Returning lexicon {lexicon_id} with {lexicon.term_count} terms")
-        return LexiconDetailResponse(
-            lexicon_id=lexicon.lexicon_id,
-            term_count=lexicon.term_count,
-            last_updated=lexicon.last_updated,
-            description=lexicon.description
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching lexicon {lexicon_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve lexicon '{lexicon_id}'"
-    "/{lexicon_id}/terms/{term_id}",
-    response_model=TermResponse,
-    summary="Get specific term details",
-    description="Retrieve full details of a specific term by ID"
-)
-async def get_term(
-    lexicon_id: str = Path(..., description="Lexicon identifier"),
-    term_id: int = Path(..., ge=1, description="Term ID"),
+    file: UploadFile = File(..., description="JSON or CSV file containing lexicon terms"),
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(get_api_key)
+    api_key=Depends(get_api_key)
 ):
     """
-    Get details of a specific term.
+    Import lexicon terms from an uploaded file.
     
-    - **lexicon_id**: Identifier for the lexicon
-    - **term_id**: Unique identifier of the term
-    
-    Returns full term object including metadata.
+    Validates the file format, checks for duplicates and conflicts,
+    and imports all valid terms in an atomic transaction.
     """
-    # Validate lexicon_id format
-    lexicon_id = validate_lexicon_id(lexicon_id)
+    logger.info(f"Import request for lexicon '{lexicon_id}' with file '{file.filename}'")
     
-    try:
-        # Get term using service
-        term = lexicon_service.get_term_by_id(db, lexicon_id, term_id)
-        
-        if not term:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
-            )
-        
-        return term
+    # Validate file size
+    await validate_file_size(file)
     
-    except HTTPException:
-        raise
+    # Determine file format and parse
+    filename_lower = file.filename.lower() if file.filename else ""
     
-    except Exception as e:
-        # Internal server error
+    if filename_lower.endswith('.json'):
+        terms = await parse_json_file(file)
+    elif filename_lower.endswith('.csv'):
+        terms = await parse_csv_file(file)
+    else:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve term: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file format. Please upload a .json or .csv file."
         )
+    
+    logger.info(f"Parsed {len(terms)} terms from file")
+    
+    # Validate terms for import (check duplicates and conflicts)
+    valid_terms, skipped_terms = validate_terms_for_import(lexicon_id, terms, db)
+    
+    logger.info(f"Validation complete: {len(valid_terms)} valid, {len(skipped_terms)} skipped")
+    
+    # Import valid terms to database (atomic transaction)
+    imported_count = 0
+    errors = []
+    
+    if valid_terms:
+        try:
+            imported_count = import_terms_to_database(lexicon_id, valid_terms, db)
+        except Exception as e:
+            logger.error(f"Database error during import: {str(e)}")
+            errors.append(f"Database error: {str(e)}")
+    
+    # Return summary
+    return ImportSummaryResponse(
+        imported=imported_count,
+        skipped=len(skipped_terms),
+        errors=errors,
+        skipped_terms=skipped_terms
+    )
 
 
-@router.put(
-    "/{lexicon_id}/terms/{term_id}",
-    response_model=TermResponse,
-    summary="Update existing term",
-    description="Update term and replacement text, updates timestamp automatically"
+@router.get(
+    "/{lexicon_id}/export",
+    summary="Export lexicon terms to file",
+    description="""
+    Export all active terms from a lexicon in JSON or CSV format.
+    
+    **Export Formats:**
+    - **JSON** (default): Array of objects with 'term' and 'replacement' fields
+    - **CSV**: Two columns with header row (term, replacement)
+    
+    **Query Parameters:**
+    - `format`: Specify export format ('json' or 'csv', default: 'json')
+    
+    **Response:**
+    - Sets appropriate Content-Type header (application/json or text/csv)
+    - Sets Content-Disposition header for file download
+    - Filename format: `{lexicon_id}_terms_{timestamp}.{json|csv}`
+    """,
+    responses={
+        200: {
+            "description": "Export successful",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {"term": "CT scan", "replacement": "computed tomography"},
+                        {"term": "MRI", "replacement": "magnetic resonance imaging"}
+                    ]
+                },
+                "text/csv": {
+                    "example": "term,replacement\nCT scan,computed tomography\nMRI,magnetic resonance imaging\n"
+                }
+            }
+        },
+        400: {
+            "description": "Invalid format parameter",
+            "model": ErrorDetail
+        },
+        401: {
+            "description": "Missing or invalid API key",
+            "model": ErrorDetail
+        }
+    }
 )
-async def update_term(
-    lexicon_id: str = Path(..., description="Lexicon identifier"),
-    term_id: int = Path(..., ge=1, description="Term ID"),
-    term_data: TermUpdate = ...,
+async def export_lexicon_terms(
+    lexicon_id: str,
+    format: ExportFormat = Query(
+        ExportFormat.JSON, 
+        description="Export format: 'json' or 'csv'"
+    ),
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(get_api_key)
+    api_key=Depends(get_api_key)
 ):
     """
-    Update an existing term.
+    Export all active lexicon terms in the specified format.
     
-    - **lexicon_id**: Identifier for the lexicon
-    - **term_id**: Unique identifier of the term to update
-    - **term**: Updated term text
-    - **replacement**: Updated replacement text
-    
-    Returns the updated term with new timestamp.
+    Returns a file download response with appropriate headers.
     """
-    # Validate lexicon_id format
-    lexicon_id = validate_lexicon_id(lexicon_id)
+    logger.info(f"Export request for lexicon '{lexicon_id}' in format '{format}'")
     
-    try:
-        # Update term using service
-        updated_term = lexicon_service.update_term(db, lexicon_id, term_id, term_data)
-        
-        if not updated_term:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
-            )
-        
-        return updated_term
+    # Get terms from database
+    terms = export_terms_from_database(lexicon_id, db)
     
-    except ValueError as e:
-        # Term already exists (duplicate)
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
+    # Generate timestamp for filename
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     
-    except HTTPException:
-        raise
+    # Generate export content and set headers based on format
+    if format == ExportFormat.JSON:
+        content = generate_json_export(terms)
+        media_type = "application/json"
+        filename = f"{lexicon_id}_terms_{timestamp}.json"
+    else:  # CSV
+        content = generate_csv_export(terms)
+        media_type = "text/csv"
+        filename = f"{lexicon_id}_terms_{timestamp}.csv"
     
-    except Exception as e:
-        # Internal server error
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update term: {str(e)}"
-        )
-
-
-@router.delete(
-    "/{lexicon_id}/terms/{term_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Soft delete term",
-    description="Mark term as inactive (soft delete) to maintain audit trail"
-)
-async def delete_term(
-    lexicon_id: str = Path(..., description="Lexicon identifier"),
-    term_id: int = Path(..., ge=1, description="Term ID"),
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(get_api_key)
-):
-    """
-    Soft delete a term by setting is_active=false.
+    logger.info(f"Exported {len(terms)} terms from lexicon '{lexicon_id}'")
     
-    - **lexicon_id**: Identifier for the lexicon
-    - **term_id**: Unique identifier of the term to delete
-    
-    Term is not removed from database, maintaining audit trail.
-    """
-    # Validate lexicon_id format
-    lexicon_id = validate_lexicon_id(lexicon_id)
-    
-    try:
-        # Soft delete term using service
-        deleted = lexicon_service.soft_delete_term(db, lexicon_id, term_id)
-        
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Term with ID {term_id} not found in lexicon '{lexicon_id}'"
-            )
-        
-        # 204 No Content - no response body
-        return None
-    
-    except HTTPException:
-        raise
-    
-    except Exception as e:
-        # Internal server error
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete term: {str(e)}"
-        )
+    # Return response with appropriate headers
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )

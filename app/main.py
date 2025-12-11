@@ -111,7 +111,7 @@ try:
     from app.api.endpoints import feedback
     app.include_router(feedback.router)
 except ImportError:
-    pass  # feedback module might not exist yet
+    logger.warning("Feedback endpoints not available")
 
 
 @app.get("/")

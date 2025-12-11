@@ -90,6 +90,14 @@ class ApiKey(Base):
         comment="Flag to enable/disable the key without deletion"
     )
     
+    # Admin privileges
+    is_admin = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="Whether this key has admin privileges"
+    )
+    
     # Rate limiting configuration
     rate_limit = Column(
         Integer,
@@ -126,6 +134,9 @@ class ApiKey(Base):
         
         # Index on is_active for fast validation queries
         Index('ix_api_keys_is_active', 'is_active'),
+        
+        # Index on is_admin for fast admin checks
+        Index('ix_api_keys_is_admin', 'is_admin'),
         
         # Table comment
         {'comment': 'Stores API keys with hashing, rate limits, and usage tracking'}

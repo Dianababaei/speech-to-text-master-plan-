@@ -49,8 +49,62 @@ class Feedback(Base):
         comment="Original transcription text"
     )
     
-    corrected_text = Column(
+    # Diff and accuracy metrics
+    diff_data = Column(
+        JSONB,
+        nullable=True,
+        comment="Detailed diff information"
+    )
+    
+    edit_distance = Column(
+        Integer,
+        nullable=True,
+        comment="Levenshtein edit distance"
+    )
+    
+    accuracy_score = Column(
+        Float,
+        nullable=True,
+        comment="Calculated accuracy score (0-1)"
+    )
+    
+    # Review metadata
+    review_time_seconds = Column(
+        Integer,
+        nullable=True,
+        comment="Time spent reviewing"
+    )
+    
+    reviewer = Column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="User who provided feedback"
+    )
+    
+    review_notes = Column(
         Text,
+        nullable=True,
+        comment="Additional notes from reviewer"
+    )
+    
+    # Extracted terms and type
+    extracted_terms = Column(
+        JSONB,
+        nullable=True,
+        comment="New terms extracted from corrections"
+    )
+    
+    feedback_type = Column(
+        String(50),
+        nullable=True,
+        index=True,
+        comment="Type: correction, validation, quality_issue"
+    )
+    
+    # Processing status
+    is_processed = Column(
+        Boolean,
         nullable=False,
         comment="Corrected text by user"
     )
@@ -151,6 +205,7 @@ class Feedback(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,
         comment="Timestamp when the feedback was created"
     )
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -202,7 +257,7 @@ class Feedback(Base):
             f"<Feedback(id={self.id}, "
             f"job_id={self.job_id}, "
             f"status='{self.status}', "
-            f"created_by='{self.created_by}', "
+            f"reviewer='{self.reviewer}', "
             f"created_at={self.created_at})>"
         )
     # Additional metadata (can store lexicon_id, confidence, frequency here)

@@ -113,6 +113,18 @@ app.include_router(jobs.router)
 app.include_router(admin.router)
 app.include_router(lexicons.router)
 
+try:
+    from app.api import health
+    app.include_router(health.router)
+except ImportError:
+    pass  # health module might not exist yet
+
+try:
+    from app.api.endpoints import feedback
+    app.include_router(feedback.router)
+except ImportError:
+    logger.warning("Feedback endpoints not available")
+
 
 @app.get("/")
 async def root():

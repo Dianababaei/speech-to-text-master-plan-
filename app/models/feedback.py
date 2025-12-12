@@ -1,198 +1,274 @@
 """
-Feedback Model
-
-This module defines the SQLAlchemy model for storing manual corrections to transcriptions
-for future lexicon improvements.
-
-Table: feedback
-Purpose: Store manual corrections to transcriptions with status tracking
-
-Fields:
-- id: UUID primary key (auto-generated)
-- job_id: UUID foreign key to jobs table (required)
-- lexicon_id: VARCHAR, indicates which lexicon this correction applies to (required)
-- original_text: TEXT, the original transcription text that needs correction (required)
-- corrected_text: TEXT, the manually corrected version (required)
-- status: ENUM ('pending', 'approved', 'rejected', 'auto-approved'), default: 'pending'
-- confidence: FLOAT, nullable, reserved for future automated confidence scoring
-- frequency: INTEGER, default 1, tracks how many times this correction has been submitted
-- created_by: VARCHAR, identifier for who submitted the correction (required)
-- created_at: TIMESTAMP, auto-set on creation
-- updated_at: TIMESTAMP, auto-updated on modification
-
-Indexes:
-- Index on status for filtering pending/approved/rejected feedback
-- Index on lexicon_id for filtering by domain
-- Index on created_at for date range filtering and sorting
-- Composite index on (status, lexicon_id) for combined filtering
-
-Constraints:
-- Foreign key to jobs table with ON DELETE CASCADE
-- Check constraint that corrected_text != original_text
+Feedback model for transcription corrections.
 """
-
-import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column,
-    String,
-    Text,
-    Float,
-    Integer,
-    DateTime,
-    ForeignKey,
-    Index,
-    CheckConstraint,
-    Enum as SQLEnum,
-)
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
-# Import the shared Base from api_key module
 from app.models.api_key import Base
 
 
 class Feedback(Base):
     """
-    SQLAlchemy model for feedback storage and tracking.
+    Represents feedback/corrections submitted for transcription jobs.
     
-    This model handles manual corrections to transcriptions, which can be used
-    to improve lexicon terms and transcription accuracy over time.
+    This model stores user-submitted corrections to transcriptions for
+    continuous improvement and lexicon learning.
     """
-    
     __tablename__ = "feedback"
     
-    # Primary key - UUID for distributed system compatibility
+    # Primary key
     id = Column(
-        UUID(as_uuid=True),
+        Integer,
         primary_key=True,
-        default=uuid.uuid4,
+        autoincrement=True,
         nullable=False,
         comment="Unique identifier for the feedback record"
     )
     
-    # Foreign key to jobs table
+    # Reference to job
     job_id = Column(
-        String(36),
+        Integer,
         ForeignKey('jobs.id', ondelete='CASCADE'),
         nullable=False,
-        comment="Reference to the transcription job (UUID as string)"
+        comment="Reference to the transcription job"
     )
     
-    # Lexicon identifier
+    # Lexicon reference (for filtering)
     lexicon_id = Column(
-        String(255),
-        nullable=False,
-        comment="Indicates which lexicon this correction applies to"
+        String(100),
+        nullable=True,
+        comment="Lexicon used for this transcription"
     )
     
-    # Original and corrected text
+    # Correction data
     original_text = Column(
         Text,
         nullable=False,
-        comment="The original transcription text that needs correction"
+        comment="Original transcription text"
     )
     
-    corrected_text = Column(
+    # Diff and accuracy metrics
+    diff_data = Column(
+        JSONB,
+        nullable=True,
+        comment="Detailed diff information"
+    )
+    
+    edit_distance = Column(
+        Integer,
+        nullable=True,
+        comment="Levenshtein edit distance"
+    )
+    
+    accuracy_score = Column(
+        Float,
+        nullable=True,
+        comment="Calculated accuracy score (0-1)"
+    )
+    
+    # Review metadata
+    review_time_seconds = Column(
+        Integer,
+        nullable=True,
+        comment="Time spent reviewing"
+    )
+    
+    reviewer = Column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="User who provided feedback"
+    )
+    
+    review_notes = Column(
         Text,
-        nullable=False,
-        comment="The manually corrected version"
+        nullable=True,
+        comment="Additional notes from reviewer"
     )
     
-    # Status tracking with ENUM
+    # Extracted terms and type
+    extracted_terms = Column(
+        JSONB,
+        nullable=True,
+        comment="New terms extracted from corrections"
+    )
+    
+    feedback_type = Column(
+        String(50),
+        nullable=True,
+        index=True,
+        comment="Type: correction, validation, quality_issue"
+    )
+    
+    # Processing status
+    is_processed = Column(
+        Boolean,
+        nullable=False,
+        comment="Corrected text by user"
+    )
+    
+    # Status for admin review workflow
     status = Column(
-        SQLEnum(
-            'pending',
-            'approved',
-            'rejected',
-            'auto-approved',
-            name='feedback_status_enum',
-            create_type=True
-        ),
+        String(50),
         nullable=False,
         default='pending',
-        server_default='pending',
-        comment="Status: pending, approved, rejected, or auto-approved"
+        comment="Status: pending, approved, rejected"
     )
     
-    # Future-ready fields
+    # Additional metadata
     confidence = Column(
         Float,
         nullable=True,
-        comment="Reserved for future automated confidence scoring (0.0-1.0)"
+        comment="Confidence score for the correction"
     )
     
     frequency = Column(
         Integer,
         nullable=False,
         default=1,
-        server_default='1',
-        comment="Tracks how many times this correction has been submitted"
+        comment="Number of times this correction was submitted"
     )
     
-    # Creator tracking
+    # User tracking
     created_by = Column(
-        String(255),
-        nullable=False,
-        comment="Identifier for who submitted the correction"
+        String(100),
+        nullable=True,
+        comment="User who submitted the feedback"
     )
     
-    # Timestamp tracking
+    # Additional fields from original schema
+    diff_data = Column(
+        JSONB,
+        nullable=True,
+        comment="Detailed diff information"
+    )
+    
+    edit_distance = Column(
+        Integer,
+        nullable=True,
+        comment="Levenshtein edit distance"
+    )
+    
+    accuracy_score = Column(
+        Float,
+        nullable=True,
+        comment="Calculated accuracy score (0-1)"
+    )
+    
+    review_time_seconds = Column(
+        Integer,
+        nullable=True,
+        comment="Time spent reviewing"
+    )
+    
+    reviewer = Column(
+        String(100),
+        nullable=True,
+        comment="User who provided feedback (legacy field)"
+    )
+    
+    review_notes = Column(
+        Text,
+        nullable=True,
+        comment="Additional notes from reviewer"
+    )
+    
+    extracted_terms = Column(
+        JSONB,
+        nullable=True,
+        comment="New terms extracted from corrections"
+    )
+    
+    feedback_type = Column(
+        String(50),
+        nullable=True,
+        comment="Type: correction, validation, quality_issue"
+    )
+    
+    is_processed = Column(
+        Integer,  # Using Integer for boolean (0/1)
+        nullable=False,
+        default=0,
+        comment="Whether feedback has been processed for learning"
+    )
+    
+    metadata = Column(
+        JSONB,
+        nullable=True,
+        comment="Additional feedback metadata"
+    )
+    
+    # Timestamps
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,
         comment="Timestamp when the feedback was created"
     )
+    id = Column(Integer, primary_key=True, autoincrement=True)
     
-    updated_at = Column(
+    # Foreign key to jobs table (references the internal integer id)
+    job_id = Column(Integer, ForeignKey('jobs.id', ondelete='CASCADE'), nullable=False)
+    
+    # Transcription texts
+    original_text = Column(Text, nullable=False, comment='Original transcription text')
+    corrected_text = Column(Text, nullable=False, comment='Corrected text by reviewer')
+    
+    # Diff and metrics
+    diff_data = Column(JSONB, nullable=True, comment='Detailed diff information')
+    edit_distance = Column(Integer, nullable=True, comment='Levenshtein edit distance')
+    accuracy_score = Column(Float, nullable=True, comment='Calculated accuracy score (0-1)')
+    review_time_seconds = Column(Integer, nullable=True, comment='Time spent reviewing')
+    
+    # Reviewer information
+    reviewer = Column(String(100), nullable=True, comment='User who provided feedback')
+    review_notes = Column(Text, nullable=True, comment='Additional notes from reviewer')
+    
+    # Extracted data
+    extracted_terms = Column(JSONB, nullable=True, comment='New terms extracted from corrections')
+    
+    # Classification and status
+    feedback_type = Column(String(50), nullable=True, comment='Type: correction, validation, quality_issue')
+    is_processed = Column(Boolean, nullable=False, default=False, server_default='false',
+                         comment='Whether feedback has been processed for learning')
+    
+    processed_at = Column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-        comment="Timestamp when the feedback was last modified"
+        nullable=True,
+        comment="When feedback was processed"
     )
-    
-    # Relationship to Job model
-    job = relationship("Job", backref="feedback_items")
     
     # Table-level constraints and indexes
     __table_args__ = (
-        # Check constraint: corrected_text must be different from original_text
-        CheckConstraint(
-            'corrected_text != original_text',
-            name='ck_feedback_text_different'
-        ),
-        
-        # Index on status for filtering
+        Index('ix_feedback_job_id', 'job_id'),
         Index('ix_feedback_status', 'status'),
-        
-        # Index on lexicon_id for filtering by domain
         Index('ix_feedback_lexicon_id', 'lexicon_id'),
-        
-        # Index on created_at for date range filtering and sorting
         Index('ix_feedback_created_at', 'created_at'),
-        
-        # Composite index on (status, lexicon_id) for combined filtering
-        Index('ix_feedback_status_lexicon_id', 'status', 'lexicon_id'),
-        
-        # Table comment
-        {'comment': 'Stores manual corrections to transcriptions for future lexicon improvements'}
+        Index('ix_feedback_created_by', 'created_by'),
+        {'comment': 'User-submitted corrections and feedback for learning'}
     )
     
     def __repr__(self):
-        """
-        String representation of the Feedback model for debugging.
-        
-        Returns:
-            str: A readable representation showing key attributes
-        """
+        """String representation of the Feedback model for debugging."""
         return (
             f"<Feedback(id={self.id}, "
             f"job_id={self.job_id}, "
-            f"lexicon_id='{self.lexicon_id}', "
             f"status='{self.status}', "
-            f"created_by='{self.created_by}', "
+            f"reviewer='{self.reviewer}', "
             f"created_at={self.created_at})>"
         )
+    # Additional metadata (can store lexicon_id, confidence, frequency here)
+    metadata = Column(JSONB, nullable=True, comment='Additional feedback metadata')
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow,
+                       server_default='CURRENT_TIMESTAMP')
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow,
+                       onupdate=datetime.utcnow, server_default='CURRENT_TIMESTAMP')
+    processed_at = Column(DateTime(timezone=True), nullable=True, comment='When feedback was processed')
+    
+    def __repr__(self):
+        return f"<Feedback(id={self.id}, job_id={self.job_id}, reviewer={self.reviewer})>"

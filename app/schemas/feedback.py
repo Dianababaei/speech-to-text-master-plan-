@@ -11,7 +11,13 @@ from enum import Enum
 
 
 class FeedbackStatus(str, Enum):
-    """Valid feedback status values."""
+    """
+    Feedback status enumeration.
+    
+    - **pending**: Awaiting review by administrator
+    - **approved**: Correction approved and can be added to lexicon
+    - **rejected**: Correction rejected, not suitable for lexicon
+    """
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"

@@ -10,6 +10,8 @@ Tests cover:
 """
 
 import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.numerals]
 from app.services.numeral_handler import (
     persian_to_english,
     english_to_persian,

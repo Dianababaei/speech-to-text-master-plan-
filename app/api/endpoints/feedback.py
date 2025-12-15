@@ -27,6 +27,7 @@ from app.schemas.feedback import (
     FeedbackListResponse,
     FeedbackStatus
 )
+from app.schemas.errors import ERROR_RESPONSES
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +138,7 @@ This endpoint requires an admin-level API key. Admin privileges are determined b
                 }
             }
         },
-        400: {"description": "Invalid query parameters"},
-        401: {"description": "Unauthorized - missing or invalid admin API key"}
+        **{k: v for k, v in ERROR_RESPONSES.items() if k in [400, 401, 403, 500]}
     }
 )
 async def list_feedback(

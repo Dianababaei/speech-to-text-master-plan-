@@ -3,6 +3,20 @@
 # Default target
 help:
 	@echo "Available commands:"
+	@echo "  make install            - Install Python dependencies"
+	@echo "  make migrate            - Run all migrations (upgrade to head)"
+	@echo "  make migrate-down       - Rollback all migrations"
+	@echo "  make migrate-create     - Create a new migration (use MSG='description')"
+	@echo "  make migrate-history    - Show migration history"
+	@echo "  make migrate-current    - Show current migration version"
+	@echo "  make db-up              - Start PostgreSQL with Docker"
+	@echo "  make db-down            - Stop PostgreSQL Docker container"
+	@echo "  make db-reset           - Reset database (down + up migrations)"
+	@echo "  make test               - Run all tests"
+	@echo "  make test-unit          - Run unit tests only"
+	@echo "  make test-integration   - Run integration tests with test environment"
+	@echo "  make test-all           - Run all tests with coverage"
+	@echo "  make clean              - Remove Python cache files"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test            - Run all tests"
@@ -135,10 +149,47 @@ db-down:
 db-reset: migrate-down migrate
 	@echo "Database reset complete!"
 
+# Run all tests
+test:
+	pytest tests/ -v
+
+# Run unit tests only
+test-unit:
+	pytest tests/unit/ -v
+
+# Run integration tests with test environment
+test-integration:
+	@echo "Starting test environment..."
+	@docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for services..."
+	@sleep 5
+	@echo "Running integration tests..."
+	@TEST_DATABASE_URL="postgresql://test_user:test_password@localhost:5433/test_transcription" \
+	TEST_REDIS_URL="redis://localhost:6380/0" \
+	pytest tests/integration/ -v || (docker-compose -f docker-compose.test.yml down && exit 1)
+	@echo "Stopping test environment..."
+	@docker-compose -f docker-compose.test.yml down
+	@echo "Integration tests complete!"
+
+# Run all tests with coverage
+test-all:
+	@echo "Starting test environment..."
+	@docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for services..."
+	@sleep 5
+	@echo "Running all tests with coverage..."
+	@TEST_DATABASE_URL="postgresql://test_user:test_password@localhost:5433/test_transcription" \
+	TEST_REDIS_URL="redis://localhost:6380/0" \
+	pytest tests/ -v --cov=app --cov-report=html --cov-report=term || (docker-compose -f docker-compose.test.yml down && exit 1)
+	@echo "Stopping test environment..."
+	@docker-compose -f docker-compose.test.yml down
+	@echo "All tests complete! Coverage report: htmlcov/index.html"
+
 # Clean Python cache files
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
 	find . -type f -name "*.log" -delete
-	@echo "Cleaned Python cache files"
+	rm -rf htmlcov/ .coverage .pytest_cache/
+	@echo "Cleaned Python cache files and test artifacts"

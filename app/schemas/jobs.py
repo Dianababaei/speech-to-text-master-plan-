@@ -10,7 +10,14 @@ from pydantic import BaseModel, Field
 
 
 class JobStatus(str, Enum):
-    """Enum for job status values."""
+    """
+    Job status enumeration.
+    
+    - **pending**: Job queued but not yet started
+    - **processing**: Job is actively being transcribed
+    - **completed**: Transcription completed successfully
+    - **failed**: Transcription failed due to error
+    """
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"

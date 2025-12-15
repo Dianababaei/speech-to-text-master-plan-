@@ -6,6 +6,34 @@ help:
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install         - Install Python dependencies"
+	@echo "  make install            - Install Python dependencies"
+	@echo "  make migrate            - Run all migrations (upgrade to head)"
+	@echo "  make migrate-down       - Rollback all migrations"
+	@echo "  make migrate-create     - Create a new migration (use MSG='description')"
+	@echo "  make migrate-history    - Show migration history"
+	@echo "  make migrate-current    - Show current migration version"
+	@echo "  make db-up              - Start PostgreSQL with Docker"
+	@echo "  make db-down            - Stop PostgreSQL Docker container"
+	@echo "  make db-reset           - Reset database (down + up migrations)"
+	@echo "  make test               - Run all tests"
+	@echo "  make test-unit          - Run unit tests only"
+	@echo "  make test-integration   - Run integration tests with test environment"
+	@echo "  make test-all           - Run all tests with coverage"
+	@echo "  make clean              - Remove Python cache files"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make test            - Run all tests"
+	@echo "  make test-unit       - Run unit tests only"
+	@echo "  make test-integration- Run integration tests only"
+	@echo "  make test-coverage   - Run tests with coverage report"
+	@echo "  make test-auth       - Run authentication tests"
+	@echo "  make test-lexicon    - Run lexicon service tests"
+	@echo "  make test-text       - Run text processing tests"
+	@echo "  make test-numerals   - Run numeral conversion tests"
+	@echo ""
+	@echo "Development:"
+	@echo "  make install         - Install Python dependencies"
+	@echo "  make install-dev     - Install dev dependencies"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate         - Run all migrations (upgrade to head)"
@@ -37,6 +65,56 @@ help:
 # Install dependencies
 install:
 	pip install -r requirements.txt
+
+# Install dev dependencies including test tools
+install-dev:
+	pip install -e ".[dev]"
+
+# Run all tests
+test:
+	@echo "Running all tests..."
+	pytest
+
+# Run unit tests only
+test-unit:
+	@echo "Running unit tests..."
+	pytest -m unit
+
+# Run integration tests only
+test-integration:
+	@echo "Running integration tests..."
+	pytest -m integration
+
+# Run tests with coverage report
+test-coverage:
+	@echo "Running tests with coverage..."
+	pytest --cov=app --cov-report=html --cov-report=term-missing
+	@echo "Coverage report generated: htmlcov/index.html"
+
+# Run authentication tests
+test-auth:
+	@echo "Running authentication tests..."
+	pytest -m auth -v
+
+# Run lexicon service tests
+test-lexicon:
+	@echo "Running lexicon service tests..."
+	pytest -m lexicon -v
+
+# Run text processing tests
+test-text:
+	@echo "Running text processing tests..."
+	pytest -m text_processing -v
+
+# Run numeral conversion tests
+test-numerals:
+	@echo "Running numeral conversion tests..."
+	pytest -m numerals -v
+
+# Run tests in verbose mode
+test-verbose:
+	@echo "Running tests in verbose mode..."
+	pytest -v
 
 # Run migrations
 migrate:
@@ -87,6 +165,42 @@ db-down:
 # Reset database
 db-reset: migrate-down migrate
 	@echo "Database reset complete!"
+
+# Run all tests
+test:
+	pytest tests/ -v
+
+# Run unit tests only
+test-unit:
+	pytest tests/unit/ -v
+
+# Run integration tests with test environment
+test-integration:
+	@echo "Starting test environment..."
+	@docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for services..."
+	@sleep 5
+	@echo "Running integration tests..."
+	@TEST_DATABASE_URL="postgresql://test_user:test_password@localhost:5433/test_transcription" \
+	TEST_REDIS_URL="redis://localhost:6380/0" \
+	pytest tests/integration/ -v || (docker-compose -f docker-compose.test.yml down && exit 1)
+	@echo "Stopping test environment..."
+	@docker-compose -f docker-compose.test.yml down
+	@echo "Integration tests complete!"
+
+# Run all tests with coverage
+test-all:
+	@echo "Starting test environment..."
+	@docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for services..."
+	@sleep 5
+	@echo "Running all tests with coverage..."
+	@TEST_DATABASE_URL="postgresql://test_user:test_password@localhost:5433/test_transcription" \
+	TEST_REDIS_URL="redis://localhost:6380/0" \
+	pytest tests/ -v --cov=app --cov-report=html --cov-report=term || (docker-compose -f docker-compose.test.yml down && exit 1)
+	@echo "Stopping test environment..."
+	@docker-compose -f docker-compose.test.yml down
+	@echo "All tests complete! Coverage report: htmlcov/index.html"
 
 # Clean Python cache files
 clean:
@@ -145,3 +259,5 @@ clean-test:
 	rm -f coverage.xml
 	rm -f coverage.json
 	@echo "Cleaned test artifacts"
+	rm -rf htmlcov/ .coverage .pytest_cache/
+	@echo "Cleaned Python cache files and test artifacts"

@@ -1,0 +1,308 @@
+{
+  "radiology": [
+    {
+      "term": "mri",
+      "replacement": "MRI",
+      "description": "Magnetic Resonance Imaging"
+    },
+    {
+      "term": "ct scan",
+      "replacement": "CT scan",
+      "description": "Computed Tomography scan"
+    },
+    {
+      "term": "xray",
+      "replacement": "X-ray",
+      "description": "X-ray imaging"
+    },
+    {
+      "term": "ultrasound",
+      "replacement": "ultrasound",
+      "description": "Ultrasound imaging"
+    },
+    {
+      "term": "pet scan",
+      "replacement": "PET scan",
+      "description": "Positron Emission Tomography"
+    },
+    {
+      "term": "mammogram",
+      "replacement": "mammogram",
+      "description": "Breast X-ray"
+    },
+    {
+      "term": "fluoroscopy",
+      "replacement": "fluoroscopy",
+      "description": "Real-time X-ray imaging"
+    },
+    {
+      "term": "angiogram",
+      "replacement": "angiogram",
+      "description": "Blood vessel imaging"
+    },
+    {
+      "term": "contrast material",
+      "replacement": "contrast material",
+      "description": "Imaging contrast agent"
+    },
+    {
+      "term": "radiologist",
+      "replacement": "radiologist",
+      "description": "Radiology specialist"
+    },
+    {
+      "term": "lesion",
+      "replacement": "lesion",
+      "description": "Abnormal tissue"
+    },
+    {
+      "term": "nodule",
+      "replacement": "nodule",
+      "description": "Small mass or lump"
+    },
+    {
+      "term": "mass",
+      "replacement": "mass",
+      "description": "Tissue growth"
+    },
+    {
+      "term": "fracture",
+      "replacement": "fracture",
+      "description": "Bone break"
+    },
+    {
+      "term": "edema",
+      "replacement": "edema",
+      "description": "Swelling due to fluid"
+    },
+    {
+      "term": "hemorrhage",
+      "replacement": "hemorrhage",
+      "description": "Bleeding"
+    },
+    {
+      "term": "atrophy",
+      "replacement": "atrophy",
+      "description": "Tissue wasting"
+    },
+    {
+      "term": "stenosis",
+      "replacement": "stenosis",
+      "description": "Narrowing"
+    },
+    {
+      "term": "calcification",
+      "replacement": "calcification",
+      "description": "Calcium deposits"
+    },
+    {
+      "term": "opacity",
+      "replacement": "opacity",
+      "description": "Area that blocks X-rays"
+    }
+  ],
+  "cardiology": [
+    {
+      "term": "ecg",
+      "replacement": "ECG",
+      "description": "Electrocardiogram"
+    },
+    {
+      "term": "ekg",
+      "replacement": "EKG",
+      "description": "Electrocardiogram (alternative)"
+    },
+    {
+      "term": "echocardiogram",
+      "replacement": "echocardiogram",
+      "description": "Heart ultrasound"
+    },
+    {
+      "term": "stress test",
+      "replacement": "stress test",
+      "description": "Exercise cardiac test"
+    },
+    {
+      "term": "holter monitor",
+      "replacement": "Holter monitor",
+      "description": "Portable ECG device"
+    },
+    {
+      "term": "cardiac catheterization",
+      "replacement": "cardiac catheterization",
+      "description": "Heart vessel examination"
+    },
+    {
+      "term": "angioplasty",
+      "replacement": "angioplasty",
+      "description": "Blood vessel opening procedure"
+    },
+    {
+      "term": "stent",
+      "replacement": "stent",
+      "description": "Tube to keep vessel open"
+    },
+    {
+      "term": "arrhythmia",
+      "replacement": "arrhythmia",
+      "description": "Irregular heartbeat"
+    },
+    {
+      "term": "atrial fibrillation",
+      "replacement": "atrial fibrillation",
+      "description": "Irregular heart rhythm"
+    },
+    {
+      "term": "tachycardia",
+      "replacement": "tachycardia",
+      "description": "Fast heart rate"
+    },
+    {
+      "term": "bradycardia",
+      "replacement": "bradycardia",
+      "description": "Slow heart rate"
+    },
+    {
+      "term": "myocardial infarction",
+      "replacement": "myocardial infarction",
+      "description": "Heart attack"
+    },
+    {
+      "term": "mi",
+      "replacement": "MI",
+      "description": "Myocardial infarction abbreviation"
+    },
+    {
+      "term": "heart failure",
+      "replacement": "heart failure",
+      "description": "Weakened heart function"
+    },
+    {
+      "term": "ejection fraction",
+      "replacement": "ejection fraction",
+      "description": "Heart pumping efficiency"
+    },
+    {
+      "term": "coronary artery disease",
+      "replacement": "coronary artery disease",
+      "description": "Heart artery blockage"
+    },
+    {
+      "term": "cad",
+      "replacement": "CAD",
+      "description": "Coronary artery disease abbreviation"
+    },
+    {
+      "term": "valvular disease",
+      "replacement": "valvular disease",
+      "description": "Heart valve disorder"
+    },
+    {
+      "term": "pericarditis",
+      "replacement": "pericarditis",
+      "description": "Heart sac inflammation"
+    }
+  ],
+  "general": [
+    {
+      "term": "bp",
+      "replacement": "BP",
+      "description": "Blood pressure"
+    },
+    {
+      "term": "hr",
+      "replacement": "HR",
+      "description": "Heart rate"
+    },
+    {
+      "term": "temp",
+      "replacement": "temperature",
+      "description": "Body temperature"
+    },
+    {
+      "term": "resp",
+      "replacement": "respiratory rate",
+      "description": "Breathing rate"
+    },
+    {
+      "term": "o2 sat",
+      "replacement": "O2 saturation",
+      "description": "Oxygen saturation"
+    },
+    {
+      "term": "prn",
+      "replacement": "PRN",
+      "description": "As needed (Latin: pro re nata)"
+    },
+    {
+      "term": "bid",
+      "replacement": "BID",
+      "description": "Twice daily (Latin: bis in die)"
+    },
+    {
+      "term": "tid",
+      "replacement": "TID",
+      "description": "Three times daily (Latin: ter in die)"
+    },
+    {
+      "term": "qid",
+      "replacement": "QID",
+      "description": "Four times daily (Latin: quater in die)"
+    },
+    {
+      "term": "qd",
+      "replacement": "QD",
+      "description": "Once daily (Latin: quaque die)"
+    },
+    {
+      "term": "po",
+      "replacement": "PO",
+      "description": "By mouth (Latin: per os)"
+    },
+    {
+      "term": "iv",
+      "replacement": "IV",
+      "description": "Intravenous"
+    },
+    {
+      "term": "im",
+      "replacement": "IM",
+      "description": "Intramuscular"
+    },
+    {
+      "term": "sc",
+      "replacement": "SC",
+      "description": "Subcutaneous"
+    },
+    {
+      "term": "stat",
+      "replacement": "STAT",
+      "description": "Immediately (Latin: statim)"
+    },
+    {
+      "term": "npo",
+      "replacement": "NPO",
+      "description": "Nothing by mouth (Latin: nil per os)"
+    },
+    {
+      "term": "sob",
+      "replacement": "SOB",
+      "description": "Shortness of breath"
+    },
+    {
+      "term": "dx",
+      "replacement": "diagnosis",
+      "description": "Diagnosis abbreviation"
+    },
+    {
+      "term": "tx",
+      "replacement": "treatment",
+      "description": "Treatment abbreviation"
+    },
+    {
+      "term": "hx",
+      "replacement": "history",
+      "description": "History abbreviation"
+    }
+  ]
+}

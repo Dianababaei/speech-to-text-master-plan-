@@ -16,27 +16,11 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Path, status
 from sqlalchemy.orm import Session
 
 from app.schemas.jobs import JobStatusResponse, JobStatus
-
-# These imports assume the existence of database and authentication modules
-# as mentioned in the task dependencies
-try:
-    from app.db.session import get_db
-    from app.models.jobs import Job
-    from app.api.dependencies import get_api_key_id
-except ImportError:
-    # Fallback for development/testing - these should be implemented
-    # in the actual project based on task dependencies
-    def get_db():
-        """Placeholder for database session dependency."""
-        raise NotImplementedError("Database session dependency not implemented")
-    
-    class Job:
-        """Placeholder Job model."""
-        pass
-    
-    def get_api_key_id(x_api_key: str = Header(..., alias="X-API-Key")) -> int:
-        """Placeholder for API key authentication dependency."""
-        raise NotImplementedError("API key authentication not implemented")
+from app.schemas.errors import ERROR_RESPONSES
+from app.database import get_db
+from app.models import Job
+from app.auth import get_api_key
+from app.models import APIKey
 
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -106,36 +90,13 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
                 }
             }
         },
-        400: {
-            "description": "Invalid UUID format",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Invalid job_id format. Must be a valid UUID."}
-                }
-            }
-        },
-        401: {
-            "description": "Missing or invalid API key",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Invalid or missing API key"}
-                }
-            }
-        },
-        404: {
-            "description": "Job not found or unauthorized",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Job not found"}
-                }
-            }
-        }
+        **{k: v for k, v in ERROR_RESPONSES.items() if k in [400, 401, 404, 500]}
     }
 )
 async def get_job_status(
     job_id: Annotated[UUID, Path(description="Unique identifier of the job to retrieve")],
     db: Annotated[Session, Depends(get_db)],
-    api_key_id: Annotated[int, Depends(get_api_key_id)]
+    api_key: Annotated[APIKey, Depends(get_api_key)]
 ) -> JobStatusResponse:
     """
     Retrieve the status and results of a transcription job.
@@ -164,8 +125,8 @@ async def get_job_status(
     
     # Query the job by job_id AND api_key_id to ensure authorization
     job = db.query(Job).filter(
-        Job.job_id == job_id,
-        Job.api_key_id == api_key_id
+        Job.id == str(job_id),
+        Job.api_key_id == api_key.id
     ).first()
     
     # If job not found or doesn't belong to this API key, return 404
@@ -189,7 +150,7 @@ async def get_job_status(
         error_message = job.error_message
     
     return JobStatusResponse(
-        job_id=job.job_id,
+        job_id=UUID(job.id),
         status=job.status,
         created_at=job.created_at,
         completed_at=job.completed_at,

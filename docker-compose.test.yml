@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Test PostgreSQL Database
+  test_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_transcription
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts with dev DB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /var/lib/postgresql/data  # Use tmpfs for faster test execution
+
+  # Test Redis Instance
+  test_redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts with dev Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    tmpfs:
+      - /data  # Use tmpfs for faster test execution
+
+networks:
+  default:
+    name: test_network

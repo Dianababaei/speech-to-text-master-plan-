@@ -1,18 +1,45 @@
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Security
+from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database import get_db
 from app.models import APIKey
 
+# Define API key security scheme for OpenAPI documentation
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    description="API key for authentication. Contact support to obtain an API key.",
+    auto_error=False
+)
+
 
 async def get_api_key(
-    x_api_key: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Security(api_key_header),
     db: Session = Depends(get_db)
 ) -> APIKey:
     """
-    Dependency to validate API key from header.
-    Raises 401 if API key is missing or invalid.
+    Validate API key from X-API-Key header.
+    
+    This dependency authenticates requests using an API key.
+    All protected endpoints should include this dependency.
+    
+    Args:
+        x_api_key: API key from X-API-Key header
+        db: Database session for key validation
+    
+    Returns:
+        APIKey: Validated API key object with project info
+    
+    Raises:
+        HTTPException 401: If API key is missing or invalid
+        
+    Example:
+        ```python
+        @router.get("/protected")
+        async def protected_endpoint(api_key: APIKey = Depends(get_api_key)):
+            return {"project": api_key.project_name}
+        ```
     """
     if not x_api_key:
         raise HTTPException(
@@ -38,13 +65,34 @@ async def get_admin_api_key(
     api_key: APIKey = Depends(get_api_key)
 ) -> APIKey:
     """
-    Dependency to validate admin-level API key.
-    Requires a valid API key with admin privileges.
+    Validate admin-level API key.
     
-    Admin privileges are determined by checking if the metadata field
-    contains {"role": "admin"} or if the project_name contains "admin".
+    This dependency requires a valid API key with administrator privileges.
+    Use this for endpoints that perform administrative operations like:
+    - Reviewing and approving feedback
+    - Triggering maintenance tasks
+    - Accessing sensitive data
     
-    Raises 401 if API key is missing/invalid, 403 if not an admin key.
+    Admin privileges are determined by:
+    1. Metadata field contains `{"role": "admin"}`, OR
+    2. Project name contains "admin"
+    
+    Args:
+        api_key: Validated API key from get_api_key dependency
+    
+    Returns:
+        APIKey: Validated admin API key object
+    
+    Raises:
+        HTTPException 401: If API key is missing or invalid
+        HTTPException 403: If API key is valid but not admin-level
+        
+    Example:
+        ```python
+        @router.post("/admin/approve")
+        async def admin_endpoint(admin_key: APIKey = Depends(get_admin_api_key)):
+            return {"admin": admin_key.project_name}
+        ```
     """
     # Check if API key has admin role in metadata
     if api_key.metadata and isinstance(api_key.metadata, dict):

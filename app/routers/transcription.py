@@ -10,6 +10,8 @@ from app.database import get_db
 from app.models import Job, APIKey
 from app.auth import get_api_key
 from app.config import settings
+from app.schemas.transcription import TranscriptionSubmitResponse
+from app.schemas.errors import ERROR_RESPONSES
 
 
 router = APIRouter(prefix="", tags=["transcription"])
@@ -100,29 +102,99 @@ async def save_audio_file(file: UploadFile, filename: str) -> tuple[bool, Option
         return False, None, f"Failed to save file: {str(e)}"
 
 
-@router.post("/transcribe", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/transcribe",
+    response_model=TranscriptionSubmitResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Submit audio for transcription",
+    description="""
+Submit an audio file for asynchronous speech-to-text transcription.
+
+## Process Flow
+
+1. **Upload**: Submit audio file with optional lexicon selection
+2. **Validation**: File format and size are validated
+3. **Storage**: Audio file is securely stored
+4. **Queue**: Transcription job is queued for processing
+5. **Poll**: Use the returned `job_id` to check status via `/jobs/{job_id}`
+
+## Audio Requirements
+
+- **Formats**: WAV, MP3, M4A
+- **Max Size**: 10MB (configurable)
+- **Quality**: Higher quality audio produces better transcription results
+
+## Lexicon Selection
+
+Choose a domain-specific lexicon for better accuracy:
+- `radiology`: Medical imaging terminology
+- `cardiology`: Cardiovascular terms
+- `legal`: Legal terminology
+- `general`: Default general-purpose lexicon
+
+Lexicon can be specified via:
+1. Header: `X-Lexicon-ID: radiology`
+2. Query parameter: `?lexicon=radiology`
+
+If not specified, defaults to configured default lexicon.
+
+## Authentication
+
+Requires valid API key in `X-API-Key` header.
+
+## Example Usage
+
+```bash
+curl -X POST "https://api.example.com/transcribe?lexicon=radiology" \\
+  -H "X-API-Key: your_api_key_here" \\
+  -F "audio=@recording.wav"
+```
+    """,
+    responses={
+        202: {
+            "description": "Transcription job accepted and queued for processing",
+            "model": TranscriptionSubmitResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "success": {
+                            "summary": "Successful submission",
+                            "value": {
+                                "job_id": "123e4567-e89b-12d3-a456-426614174000",
+                                "status": "pending",
+                                "created_at": "2024-01-15T10:30:00Z",
+                                "lexicon_id": "radiology"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        **{k: v for k, v in ERROR_RESPONSES.items() if k in [400, 401, 413, 500, 503]}
+    }
+)
 async def submit_transcription(
-    audio: UploadFile = File(..., description="Audio file to transcribe (WAV, MP3, or M4A)"),
-    x_lexicon_id: Optional[str] = Header(None, description="Lexicon ID for domain-specific transcription"),
-    lexicon: Optional[str] = Query(None, description="Lexicon ID (alternative to header)"),
+    audio: UploadFile = File(
+        ...,
+        description="Audio file to transcribe (WAV, MP3, or M4A format, max 10MB)"
+    ),
+    x_lexicon_id: Optional[str] = Header(
+        None,
+        alias="X-Lexicon-ID",
+        description="Lexicon ID for domain-specific transcription (e.g., 'radiology', 'legal')"
+    ),
+    lexicon: Optional[str] = Query(
+        None,
+        description="Lexicon ID as query parameter (alternative to header)"
+    ),
     api_key: APIKey = Depends(get_api_key),
     db: Session = Depends(get_db)
 ):
     """
-    Submit an audio file for asynchronous transcription.
+    Submit an audio file for asynchronous transcription processing.
     
-    **Request:**
-    - File: audio file (multipart/form-data)
-    - Header or Query: lexicon_id (optional, defaults to 'radiology')
-    
-    **Response:**
-    - 202 Accepted: Job created successfully
-    - Returns job_id, status, and created_at timestamp
-    
-    **Validation:**
-    - File format must be WAV, MP3, or M4A
-    - File size must not exceed configured limit (default 10MB)
-    - Valid API key required (X-API-Key header)
+    The audio file is validated, stored, and queued for transcription.
+    Returns a job ID that can be used to poll for status and retrieve results.
     """
     
     # Extract lexicon_id from header or query param (header takes precedence)
@@ -187,8 +259,9 @@ async def submit_transcription(
         )
     
     # Return job information (202 Accepted - async processing)
-    return {
-        "job_id": job.id,
-        "status": job.status,
-        "created_at": job.created_at.isoformat() + "Z"
-    }
+    return TranscriptionSubmitResponse(
+        job_id=job.id,
+        status=job.status,
+        created_at=job.created_at.isoformat() + "Z",
+        lexicon_id=lexicon_id
+    )

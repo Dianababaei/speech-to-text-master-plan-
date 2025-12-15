@@ -1,6 +1,7 @@
 # Environment variables
 .env
 .env.local
+.env.*.local
 
 # Python
 __pycache__/
@@ -33,17 +34,16 @@ ENV/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 *.cover
 .hypothesis/
+.tox/
+coverage.xml
+coverage.json
+.pytest_cache/
 
 # IDEs
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# IDE
 .vscode/
 .idea/
 *.swp
@@ -54,7 +54,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Audio files (for testing)
+# Audio files (temporary test files - keep .env.test and sample test files)
+temp_audio/
+test_audio_storage/
 *.mp3
 *.wav
 *.m4a
@@ -68,36 +70,21 @@ Thumbs.db
 # Logs
 *.log
 logs/
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Logs
-*.log
-logs/
 
 # Uploads and data
 uploads/
 data/
-*.mp3
-*.wav
-*.m4a
 
 # Redis
 dump.rdb
 
 # Docker
 docker-compose.override.yml
-# Environment variables
-.env
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
-data/
 
 # Audio storage
 audio_storage/
@@ -108,9 +95,5 @@ transcriptions/
 transcription_results.txt
 transcriptions.csv
 
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
+# Pre-commit
+.pre-commit-config.yaml.backup

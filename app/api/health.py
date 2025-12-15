@@ -1,16 +1,70 @@
 from datetime import datetime
+from typing import Dict, Any
 from fastapi import APIRouter, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
+from pydantic import BaseModel, Field
 import redis
 from app.database import engine
-from app.main import redis_client
 from app.config.settings import settings
+from app.schemas.errors import ERROR_RESPONSES
 import asyncio
 from concurrent.futures import TimeoutError
 import signal
 
 router = APIRouter(tags=["health"])
+
+
+class HealthCheckResponse(BaseModel):
+    """Health check response model."""
+    
+    status: str = Field(
+        ...,
+        description="Overall health status: 'healthy' or 'unhealthy'",
+        examples=["healthy", "unhealthy"]
+    )
+    postgres: str = Field(
+        ...,
+        description="PostgreSQL database status: 'ok' or 'error'",
+        examples=["ok", "error"]
+    )
+    redis: str = Field(
+        ...,
+        description="Redis cache status: 'ok' or 'error'",
+        examples=["ok", "error"]
+    )
+    timestamp: str = Field(
+        ...,
+        description="ISO 8601 timestamp of the health check",
+        examples=["2024-01-15T10:30:00Z"]
+    )
+    postgres_error: str = Field(
+        None,
+        description="Error message if PostgreSQL check failed"
+    )
+    redis_error: str = Field(
+        None,
+        description="Error message if Redis check failed"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "status": "healthy",
+                    "postgres": "ok",
+                    "redis": "ok",
+                    "timestamp": "2024-01-15T10:30:00Z"
+                },
+                {
+                    "status": "unhealthy",
+                    "postgres": "error",
+                    "redis": "ok",
+                    "timestamp": "2024-01-15T10:30:00Z",
+                    "postgres_error": "Database connection failed: connection timeout"
+                }
+            ]
+        }
 
 
 def check_postgres() -> tuple[str, str]:
@@ -45,6 +99,9 @@ def check_redis() -> tuple[str, str]:
         error_message: Error details if unhealthy, empty string if healthy
     """
     try:
+        # Create Redis client for health check
+        redis_client = redis.from_url(settings.REDIS_URL, socket_timeout=5)
+        
         # Simple ping command to verify connectivity
         response = redis_client.ping()
         if response:
@@ -83,21 +140,91 @@ def run_with_timeout(func, timeout_seconds: int):
             return "error", f"Health check timed out after {timeout_seconds} seconds"
 
 
-@router.get("/health")
-async def health_check(response: Response):
+@router.get(
+    "/health",
+    response_model=HealthCheckResponse,
+    summary="Service health check",
+    description="""
+Check the health status of the service and its dependencies.
+
+This endpoint verifies connectivity to:
+- **PostgreSQL Database**: Primary data store for jobs, lexicons, and feedback
+- **Redis Cache**: Caching layer for lexicon data
+
+## Health Status
+
+- **200 OK**: All dependencies are operational
+- **503 Service Unavailable**: One or more dependencies are unhealthy
+
+Each dependency is checked with a configurable timeout (default 5 seconds).
+
+## Response Fields
+
+- `status`: Overall service health ('healthy' or 'unhealthy')
+- `postgres`: PostgreSQL database status ('ok' or 'error')
+- `redis`: Redis cache status ('ok' or 'error')
+- `timestamp`: ISO 8601 timestamp of the check
+- `postgres_error`: Error details if PostgreSQL is unhealthy (optional)
+- `redis_error`: Error details if Redis is unhealthy (optional)
+
+## Use Cases
+
+- **Load Balancer**: Use for health checks and traffic routing
+- **Monitoring**: Set up alerts when health status becomes unhealthy
+- **Deployment**: Verify service is ready before accepting traffic
+    """,
+    responses={
+        200: {
+            "description": "Service is healthy - all dependencies operational",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "healthy",
+                        "postgres": "ok",
+                        "redis": "ok",
+                        "timestamp": "2024-01-15T10:30:00Z"
+                    }
+                }
+            }
+        },
+        503: {
+            "description": "Service is unhealthy - one or more dependencies down",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "database_error": {
+                            "summary": "Database connection failed",
+                            "value": {
+                                "status": "unhealthy",
+                                "postgres": "error",
+                                "redis": "ok",
+                                "timestamp": "2024-01-15T10:30:00Z",
+                                "postgres_error": "Database connection failed: connection timeout"
+                            }
+                        },
+                        "redis_error": {
+                            "summary": "Redis connection failed",
+                            "value": {
+                                "status": "unhealthy",
+                                "postgres": "ok",
+                                "redis": "error",
+                                "timestamp": "2024-01-15T10:30:00Z",
+                                "redis_error": "Redis connection failed: Connection refused"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    tags=["health"]
+)
+async def health_check(response: Response) -> HealthCheckResponse:
     """
-    Health check endpoint that verifies connectivity to all critical dependencies.
+    Perform health check on service and its dependencies.
     
-    Checks:
-    - PostgreSQL database connection
-    - Redis connection
-    
-    Returns:
-        JSON response with overall status and individual component statuses.
-        
-    Status Codes:
-        200: All dependencies are healthy
-        503: One or more dependencies are unhealthy
+    Checks PostgreSQL and Redis connectivity with timeout protection.
+    Returns detailed status for each component.
     """
     timestamp = datetime.utcnow().isoformat() + "Z"
     

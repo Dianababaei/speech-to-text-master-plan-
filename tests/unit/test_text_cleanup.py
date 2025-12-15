@@ -11,6 +11,8 @@ Tests cover all cleanup operations including:
 """
 import pytest
 
+pytestmark = [pytest.mark.unit, pytest.mark.text_processing]
+
 from app.services.text_cleanup import (
     cleanup_text,
     normalize_whitespace,

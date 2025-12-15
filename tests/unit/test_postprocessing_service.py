@@ -8,6 +8,8 @@ Tests lexicon-based text replacement with:
 - Edge cases
 """
 import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.lexicon]
 from unittest.mock import Mock, MagicMock, patch
 from sqlalchemy.orm import Session
 

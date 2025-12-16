@@ -1,15 +1,19 @@
 version: '3.8'
 
+# Docker Compose configuration for running tests
+# This provides isolated database and Redis instances for testing
+
 services:
-  # Test PostgreSQL Database
-  test_db:
+  # PostgreSQL Test Database
+  test-db:
     image: postgres:15-alpine
+    container_name: speech-test-db
     environment:
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
       POSTGRES_DB: test_transcription
     ports:
-      - "5433:5432"  # Different port to avoid conflicts with dev DB
+      - "5433:5432"  # Different port to avoid conflict with dev database
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U test_user"]
       interval: 5s
@@ -17,20 +21,64 @@ services:
       retries: 5
     tmpfs:
       - /var/lib/postgresql/data  # Use tmpfs for faster test execution
+    networks:
+      - test-network
 
-  # Test Redis Instance
-  test_redis:
+  # Redis Test Instance
+  test-redis:
     image: redis:7-alpine
+    container_name: speech-test-redis
     ports:
-      - "6380:6379"  # Different port to avoid conflicts with dev Redis
+      - "6380:6379"  # Different port to avoid conflict with dev Redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    command: redis-server --databases 16 --save ""  # Disable persistence for tests
     tmpfs:
       - /data  # Use tmpfs for faster test execution
+    networks:
+      - test-network
+
+  # Test Runner Service (optional - for CI/CD)
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speech-test-runner
+    volumes:
+      - .:/app
+      - /app/.pytest_cache  # Exclude cache from volume mount
+      - /app/htmlcov  # Exclude coverage reports
+    environment:
+      - TESTING=true
+      - DATABASE_URL=postgresql://test_user:test_password@test-db:5432/test_transcription
+      - REDIS_URL=redis://test-redis:6379/0
+      - OPENAI_API_KEY=test-api-key-12345678
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 2 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Running tests...' &&
+        pytest -v --cov=app --cov-report=term-missing --cov-report=html
+      "
 
 networks:
-  default:
-    name: test_network
+  test-network:
+    driver: bridge
+
+# Volume cleanup note:
+# Test volumes are ephemeral and don't persist between runs
+# To clean up: docker-compose -f docker-compose.test.yml down -v

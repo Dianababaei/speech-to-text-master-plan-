@@ -12,7 +12,11 @@
       "Bash(findstr:*)",
       "Bash(dir:*)",
       "Bash(timeout /t 45 /nobreak)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh auth login:*)"
     ],
     "deny": [],
     "ask": []

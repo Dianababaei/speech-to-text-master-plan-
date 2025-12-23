@@ -178,13 +178,13 @@ app.add_middleware(
 )
 
 # Register routers
-#from app.routers import lexicons
+from app.routers import lexicons
 
 app.include_router(health.router)
 app.include_router(transcription.router)
 app.include_router(jobs.router)
 app.include_router(admin.router)
-#app.include_router(lexicons.router)
+app.include_router(lexicons.router)
 
 # Feedback endpoint disabled due to syntax errors
 # try:

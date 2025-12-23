@@ -1,0 +1,754 @@
+[
+  {
+    "term": "HU",
+    "replacement": "واحد هانسفیلد"
+  },
+  {
+    "term": "آبسه",
+    "replacement": "آبسه"
+  },
+  {
+    "term": "آرنج",
+    "replacement": "آرنج"
+  },
+  {
+    "term": "آناکویک",
+    "replacement": "بی‌اکو"
+  },
+  {
+    "term": "آنحراف",
+    "replacement": "انحراف"
+  },
+  {
+    "term": "آنوریسم",
+    "replacement": "آنوریسم"
+  },
+  {
+    "term": "آکسیال",
+    "replacement": "محوری"
+  },
+  {
+    "term": "آیزوانتنس",
+    "replacement": "هم شدت"
+  },
+  {
+    "term": "ابعاد",
+    "replacement": "ابعاد"
+  },
+  {
+    "term": "اتروفی",
+    "replacement": "آتروفی"
+  },
+  {
+    "term": "ادیم",
+    "replacement": "ادم"
+  },
+  {
+    "term": "ارتفاع",
+    "replacement": "ارتفاع"
+  },
+  {
+    "term": "استئوآرتریت",
+    "replacement": "استئوآرتریت"
+  },
+  {
+    "term": "استخوان",
+    "replacement": "استخوان"
+  },
+  {
+    "term": "استنوس",
+    "replacement": "استنوز"
+  },
+  {
+    "term": "استیوفیت",
+    "replacement": "استئوفیت"
+  },
+  {
+    "term": "استیوپروز",
+    "replacement": "استئوپروز"
+  },
+  {
+    "term": "استیوپنی",
+    "replacement": "استئوپنی"
+  },
+  {
+    "term": "اسپرین",
+    "replacement": "رگ به رگ شدگی"
+  },
+  {
+    "term": "اسپلنومگالی",
+    "replacement": "بزرگی طحال"
+  },
+  {
+    "term": "افصایش",
+    "replacement": "افزایش"
+  },
+  {
+    "term": "افصایی",
+    "replacement": "فضایی"
+  },
+  {
+    "term": "افوزیون",
+    "replacement": "افیوژن"
+  },
+  {
+    "term": "اندازه",
+    "replacement": "اندازه"
+  },
+  {
+    "term": "اوبستراکسیون",
+    "replacement": "انسداد"
+  },
+  {
+    "term": "اکو",
+    "replacement": "اکو"
+  },
+  {
+    "term": "اکوژنیسیته",
+    "replacement": "اکوژنیسیته"
+  },
+  {
+    "term": "اینتراآرتیکولار",
+    "replacement": "داخل مفصلی"
+  },
+  {
+    "term": "اینتراموسکولار",
+    "replacement": "داخل عضلانی"
+  },
+  {
+    "term": "اینفریور",
+    "replacement": "پایینی"
+  },
+  {
+    "term": "بازو",
+    "replacement": "بازو"
+  },
+  {
+    "term": "بافد",
+    "replacement": "بافت"
+  },
+  {
+    "term": "بدخیم",
+    "replacement": "بدخیم"
+  },
+  {
+    "term": "بی راد",
+    "replacement": "BI-RADS"
+  },
+  {
+    "term": "تانذون",
+    "replacement": "تاندون"
+  },
+  {
+    "term": "تحمدان",
+    "replacement": "تخمدان"
+  },
+  {
+    "term": "ترفیغه",
+    "replacement": "ترقوه"
+  },
+  {
+    "term": "تست",
+    "replacement": "آزمایش"
+  },
+  {
+    "term": "تشخیص",
+    "replacement": "تشخیص"
+  },
+  {
+    "term": "تغزیه",
+    "replacement": "تغذیه"
+  },
+  {
+    "term": "تقریب",
+    "replacement": "تقریبا"
+  },
+  {
+    "term": "تومور",
+    "replacement": "تومور"
+  },
+  {
+    "term": "تی تو",
+    "replacement": "T2"
+  },
+  {
+    "term": "تی وان",
+    "replacement": "T1"
+  },
+  {
+    "term": "جزگی",
+    "replacement": "جزئی"
+  },
+  {
+    "term": "جزیی",
+    "replacement": "جزئی"
+  },
+  {
+    "term": "جمجمه",
+    "replacement": "جمجمه"
+  },
+  {
+    "term": "جناق",
+    "replacement": "جناق"
+  },
+  {
+    "term": "حالط",
+    "replacement": "خالص"
+  },
+  {
+    "term": "حجم",
+    "replacement": "حجم"
+  },
+  {
+    "term": "حفره",
+    "replacement": "حفره"
+  },
+  {
+    "term": "خارجی",
+    "replacement": "خارجی"
+  },
+  {
+    "term": "خفیض",
+    "replacement": "خفیف"
+  },
+  {
+    "term": "خوش خیم",
+    "replacement": "خوش‌خیم"
+  },
+  {
+    "term": "داخلی",
+    "replacement": "داخلی"
+  },
+  {
+    "term": "دانسیته",
+    "replacement": "دانسیته"
+  },
+  {
+    "term": "داپلر",
+    "replacement": "داپلر"
+  },
+  {
+    "term": "دسانسیون",
+    "replacement": "آسانسیون"
+  },
+  {
+    "term": "دنده",
+    "replacement": "دنده"
+  },
+  {
+    "term": "دو طرفه",
+    "replacement": "دوطرفه"
+  },
+  {
+    "term": "دورسال",
+    "replacement": "پشتی"
+  },
+  {
+    "term": "دیستال",
+    "replacement": "دور"
+  },
+  {
+    "term": "دیسلوکاسیون",
+    "replacement": "دررفتگی"
+  },
+  {
+    "term": "دیسپلاسی",
+    "replacement": "دیسپلازی"
+  },
+  {
+    "term": "دیفیوژن",
+    "replacement": "دیفیوژن"
+  },
+  {
+    "term": "دیلاتاسیون",
+    "replacement": "دیلاتاسیون"
+  },
+  {
+    "term": "رادیواوپاک",
+    "replacement": "رادیواوپک"
+  },
+  {
+    "term": "رادیولوسنت",
+    "replacement": "رادیولوسنت"
+  },
+  {
+    "term": "رادیوگراضی",
+    "replacement": "رادیوگرافی"
+  },
+  {
+    "term": "ران",
+    "replacement": "ران"
+  },
+  {
+    "term": "رتروپریتونال",
+    "replacement": "پشت صفاقی"
+  },
+  {
+    "term": "رحیم",
+    "replacement": "رحم"
+  },
+  {
+    "term": "زانو",
+    "replacement": "زانو"
+  },
+  {
+    "term": "زخامت",
+    "replacement": "ضخامت"
+  },
+  {
+    "term": "ساجیتال",
+    "replacement": "کناری"
+  },
+  {
+    "term": "ساغد",
+    "replacement": "ساعد"
+  },
+  {
+    "term": "ساف",
+    "replacement": "ساق"
+  },
+  {
+    "term": "سانتیمتر",
+    "replacement": "سانتی‌متر"
+  },
+  {
+    "term": "سخامت",
+    "replacement": "ضخامت"
+  },
+  {
+    "term": "سوبکوتانه",
+    "replacement": "زیرجلدی"
+  },
+  {
+    "term": "سونوگراضی",
+    "replacement": "سونوگرافی"
+  },
+  {
+    "term": "سوپریور",
+    "replacement": "بالایی"
+  },
+  {
+    "term": "سیگنال",
+    "replacement": "سیگنال"
+  },
+  {
+    "term": "شدید",
+    "replacement": "شدید"
+  },
+  {
+    "term": "شریان",
+    "replacement": "شریان"
+  },
+  {
+    "term": "شواد",
+    "replacement": "قدرت"
+  },
+  {
+    "term": "ضحامت",
+    "replacement": "ضخامت"
+  },
+  {
+    "term": "ضعبط",
+    "replacement": "ضبط"
+  },
+  {
+    "term": "طبیعی",
+    "replacement": "طبیعی"
+  },
+  {
+    "term": "طحان",
+    "replacement": "طحال"
+  },
+  {
+    "term": "طول",
+    "replacement": "طول"
+  },
+  {
+    "term": "عرض",
+    "replacement": "عرض"
+  },
+  {
+    "term": "عروف",
+    "replacement": "عروق"
+  },
+  {
+    "term": "عزله",
+    "replacement": "عضله"
+  },
+  {
+    "term": "عصف",
+    "replacement": "عصب"
+  },
+  {
+    "term": "غدد",
+    "replacement": "غدد"
+  },
+  {
+    "term": "غضروض",
+    "replacement": "غضروف"
+  },
+  {
+    "term": "غلیه",
+    "replacement": "کلیه"
+  },
+  {
+    "term": "غیر طبیعی",
+    "replacement": "غیرطبیعی"
+  },
+  {
+    "term": "فاصله",
+    "replacement": "فاصله"
+  },
+  {
+    "term": "فاغله",
+    "replacement": "فاصله"
+  },
+  {
+    "term": "فقارت",
+    "replacement": "فقرات"
+  },
+  {
+    "term": "فلر",
+    "replacement": "FLAIR"
+  },
+  {
+    "term": "فلو",
+    "replacement": "جریان"
+  },
+  {
+    "term": "فک",
+    "replacement": "فک"
+  },
+  {
+    "term": "فیبروآدنوم",
+    "replacement": "فیبروآدنوم"
+  },
+  {
+    "term": "فیبروس",
+    "replacement": "فیبروز"
+  },
+  {
+    "term": "فیبولا",
+    "replacement": "فیبولا"
+  },
+  {
+    "term": "قطر",
+    "replacement": "قطر"
+  },
+  {
+    "term": "قظر",
+    "replacement": "قطر"
+  },
+  {
+    "term": "قوز",
+    "replacement": "قوزک"
+  },
+  {
+    "term": "لترال",
+    "replacement": "جانبی"
+  },
+  {
+    "term": "لنفادنوپاتی",
+    "replacement": "لنفادنوپاتی"
+  },
+  {
+    "term": "لنفاوی",
+    "replacement": "لنفاوی"
+  },
+  {
+    "term": "لوزالمغده",
+    "replacement": "لوزالمعده"
+  },
+  {
+    "term": "لگن",
+    "replacement": "لگن"
+  },
+  {
+    "term": "لیپوماتوس",
+    "replacement": "چربی"
+  },
+  {
+    "term": "لیکامان",
+    "replacement": "لیگامان"
+  },
+  {
+    "term": "ماری",
+    "replacement": "مثانه"
+  },
+  {
+    "term": "ماموگراضی",
+    "replacement": "ماموگرافی"
+  },
+  {
+    "term": "ماکزیمال",
+    "replacement": "حداکثر"
+  },
+  {
+    "term": "متاستاس",
+    "replacement": "متاستاز"
+  },
+  {
+    "term": "متقارن",
+    "replacement": "متقارن"
+  },
+  {
+    "term": "متوسط",
+    "replacement": "متوسط"
+  },
+  {
+    "term": "مجدد",
+    "replacement": "مجدد"
+  },
+  {
+    "term": "محیطی",
+    "replacement": "محیطی"
+  },
+  {
+    "term": "مخ",
+    "replacement": "مغز"
+  },
+  {
+    "term": "مدیاستینال",
+    "replacement": "مدیاستن"
+  },
+  {
+    "term": "مدیال",
+    "replacement": "میانی"
+  },
+  {
+    "term": "مرکسی",
+    "replacement": "مرکزی"
+  },
+  {
+    "term": "مسهول",
+    "replacement": "مسئول"
+  },
+  {
+    "term": "مغده",
+    "replacement": "معده"
+  },
+  {
+    "term": "مفسل",
+    "replacement": "مفصل"
+  },
+  {
+    "term": "منتشر",
+    "replacement": "منتشر"
+  },
+  {
+    "term": "مهره",
+    "replacement": "مهره"
+  },
+  {
+    "term": "موجو",
+    "replacement": "موجود"
+  },
+  {
+    "term": "موضعی",
+    "replacement": "موضعی"
+  },
+  {
+    "term": "موفعیت",
+    "replacement": "موقعیت"
+  },
+  {
+    "term": "مچ",
+    "replacement": "مچ"
+  },
+  {
+    "term": "میلیمتر",
+    "replacement": "میلی‌متر"
+  },
+  {
+    "term": "مینیمال",
+    "replacement": "حداقل"
+  },
+  {
+    "term": "میکروکلسیفیکاسیون",
+    "replacement": "میکروکلسیفیکاسیون"
+  },
+  {
+    "term": "نامتقارن",
+    "replacement": "نامتقارن"
+  },
+  {
+    "term": "نان کنتراست",
+    "replacement": "بدون کنتراست"
+  },
+  {
+    "term": "ناهمگن",
+    "replacement": "ناهموژن"
+  },
+  {
+    "term": "نخاغ",
+    "replacement": "نخاع"
+  },
+  {
+    "term": "ندول",
+    "replacement": "ندول"
+  },
+  {
+    "term": "نضر",
+    "replacement": "نظر"
+  },
+  {
+    "term": "نورولوژیک",
+    "replacement": "عصبی"
+  },
+  {
+    "term": "نکروس",
+    "replacement": "نکروز"
+  },
+  {
+    "term": "نیوپلاسم",
+    "replacement": "نئوپلاسم"
+  },
+  {
+    "term": "هایپرانتنس",
+    "replacement": "فوق شدید"
+  },
+  {
+    "term": "هایپراکویک",
+    "replacement": "پراکو"
+  },
+  {
+    "term": "هایپوانتنس",
+    "replacement": "کم شدت"
+  },
+  {
+    "term": "هایپواکویک",
+    "replacement": "کم‌اکو"
+  },
+  {
+    "term": "هماتوم",
+    "replacement": "کبودی"
+  },
+  {
+    "term": "همگن",
+    "replacement": "هموژن"
+  },
+  {
+    "term": "هپاتومگالی",
+    "replacement": "بزرگی کبد"
+  },
+  {
+    "term": "هیپرتروضی",
+    "replacement": "هیپرتروفی"
+  },
+  {
+    "term": "ورید",
+    "replacement": "ورید"
+  },
+  {
+    "term": "وسکولار",
+    "replacement": "عروقی"
+  },
+  {
+    "term": "وسیف",
+    "replacement": "وسیع"
+  },
+  {
+    "term": "ونترال",
+    "replacement": "شکمی"
+  },
+  {
+    "term": "ویندو",
+    "replacement": "پنجره"
+  },
+  {
+    "term": "پاتلا",
+    "replacement": "پاتلا"
+  },
+  {
+    "term": "پارااورتیک",
+    "replacement": "کنار آئورت"
+  },
+  {
+    "term": "پاراورتبرال",
+    "replacement": "کنار مهره"
+  },
+  {
+    "term": "پرفراسیون",
+    "replacement": "سوراخ شدگی"
+  },
+  {
+    "term": "پروستان",
+    "replacement": "پروستات"
+  },
+  {
+    "term": "پروگزیمال",
+    "replacement": "نزدیک"
+  },
+  {
+    "term": "پریکاردیال",
+    "replacement": "پریکاردیال"
+  },
+  {
+    "term": "پلورال",
+    "replacement": "پلورال"
+  },
+  {
+    "term": "پنوموتراکس",
+    "replacement": "پنوموتوراکس"
+  },
+  {
+    "term": "پوست",
+    "replacement": "پوست"
+  },
+  {
+    "term": "چب",
+    "replacement": "چپ"
+  },
+  {
+    "term": "چند کانونی",
+    "replacement": "چندکانونی"
+  },
+  {
+    "term": "کادال",
+    "replacement": "دمی"
+  },
+  {
+    "term": "کاردیومگالی",
+    "replacement": "بزرگی قلب"
+  },
+  {
+    "term": "کانان",
+    "replacement": "کانال"
+  },
+  {
+    "term": "کتف",
+    "replacement": "کتف"
+  },
+  {
+    "term": "کرانیال",
+    "replacement": "سری"
+  },
+  {
+    "term": "کلسیفیکاسیون",
+    "replacement": "کلسیفیکاسیون"
+  },
+  {
+    "term": "کنتراست",
+    "replacement": "کنتراست"
+  },
+  {
+    "term": "کنسولیدیشن",
+    "replacement": "کانسولیدیشن"
+  },
+  {
+    "term": "کیسد",
+    "replacement": "کیست"
+  },
+  {
+    "term": "گادولینیوم",
+    "replacement": "گادولینیوم"
+  },
+  {
+    "term": "گایش",
+    "replacement": "کاهش"
+  },
+  {
+    "term": "یک طرفه",
+    "replacement": "یک‌طرفه"
+  }
+]

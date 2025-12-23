@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models import APIKey
+from app.services.api_key_service import validate_and_get_api_key
 
 # Define API key security scheme for OpenAPI documentation
 api_key_header = APIKeyHeader(
@@ -46,18 +47,16 @@ async def get_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key is required. Provide X-API-Key header."
         )
-    
-    api_key = db.query(APIKey).filter(
-        APIKey.key == x_api_key,
-        APIKey.is_active == 1
-    ).first()
-    
+
+    # Use bcrypt verification to validate the plaintext API key against stored hashes
+    api_key = validate_and_get_api_key(db, x_api_key)
+
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or inactive API key"
         )
-    
+
     return api_key
 
 

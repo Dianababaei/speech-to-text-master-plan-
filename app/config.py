@@ -37,9 +37,12 @@ LEXICON_CACHE_TTL = int(os.getenv("LEXICON_CACHE_TTL", "3600"))  # 1 hour defaul
 
 # Post-processing pipeline configuration
 # Each step can be enabled/disabled via environment variables
+# Pipeline processes text through: Lexicon → Cleanup → Numeral handling → GPT cleanup
 ENABLE_LEXICON_REPLACEMENT = os.getenv("ENABLE_LEXICON_REPLACEMENT", "true").lower() in ("true", "1", "yes")
 ENABLE_TEXT_CLEANUP = os.getenv("ENABLE_TEXT_CLEANUP", "true").lower() in ("true", "1", "yes")
 ENABLE_NUMERAL_HANDLING = os.getenv("ENABLE_NUMERAL_HANDLING", "true").lower() in ("true", "1", "yes")
+# Enable GPT-4o-mini post-processing for advanced transcription cleanup and formatting
+ENABLE_GPT_CLEANUP = os.getenv("ENABLE_GPT_CLEANUP", "true").lower() in ("true", "1", "yes")
 
 # Fuzzy matching configuration
 ENABLE_FUZZY_MATCHING = os.getenv("ENABLE_FUZZY_MATCHING", "true").lower() in ("true", "1", "yes")
@@ -76,5 +79,9 @@ class _Settings:
     @property
     def fuzzy_match_threshold(self):
         return FUZZY_MATCH_THRESHOLD
+    
+    @property
+    def enable_gpt_cleanup(self):
+        return ENABLE_GPT_CLEANUP
 
 settings = _Settings()

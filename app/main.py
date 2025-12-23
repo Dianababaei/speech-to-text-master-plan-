@@ -178,19 +178,20 @@ app.add_middleware(
 )
 
 # Register routers
-from app.routers import lexicons
+#from app.routers import lexicons
 
 app.include_router(health.router)
 app.include_router(transcription.router)
 app.include_router(jobs.router)
 app.include_router(admin.router)
-app.include_router(lexicons.router)
+#app.include_router(lexicons.router)
 
-try:
-    from app.api.endpoints import feedback
-    app.include_router(feedback.router)
-except ImportError as e:
-    logger.warning(f"Feedback endpoint not available: {e}")
+# Feedback endpoint disabled due to syntax errors
+# try:
+#     from app.api.endpoints import feedback
+#     app.include_router(feedback.router)
+# except ImportError as e:
+#     logger.warning(f"Feedback endpoint not available: {e}")
 
 
 @app.get(
@@ -269,16 +270,10 @@ and planning cleanup operations.
 )
 async def storage_stats():
     """
-<<<<<<< HEAD
-    Get storage statistics.
-
-    Returns information about disk usage and audio file storage.
-=======
     Get detailed storage usage statistics.
-    
+
     Returns information about disk usage and audio file storage
     to help monitor capacity and plan cleanup operations.
->>>>>>> e550594027aa8dd94198e2a6089bb1e4e775d57f
     """
     try:
         stats = get_storage_stats()
@@ -337,15 +332,9 @@ Requires valid API key (admin-level recommended)
 async def manual_cleanup():
     """
     Manually trigger audio file cleanup.
-<<<<<<< HEAD
 
     This endpoint allows administrators to manually trigger the cleanup
-    process without waiting for the scheduled background task.
-=======
-    
-    Executes the cleanup process that removes old audio files
-    based on the configured retention period.
->>>>>>> e550594027aa8dd94198e2a6089bb1e4e775d57f
+    process that removes old audio files based on the configured retention period.
     """
     from app.database import get_db
 
@@ -366,8 +355,6 @@ async def manual_cleanup():
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 
-<<<<<<< HEAD
-=======
 # Basic health endpoint (detailed health check is in /health from health router)
 @app.get(
     "/healthz",
@@ -434,7 +421,6 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
->>>>>>> e550594027aa8dd94198e2a6089bb1e4e775d57f
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -28,6 +28,7 @@ from app.services.postprocessing_service import (
     create_pipeline,
     PostProcessingError,
 )
+from app.services.lexicon_service import build_whisper_prompt_from_lexicon
 from app.utils.database import db_session_context
 from app.utils.logging import get_logger, log_with_context
 from app.config.settings import get_settings
@@ -237,7 +238,8 @@ def process_transcription_job(job_id: str) -> None:
                 job = get_job(job_id, session=session)
                 audio_file_path = job.audio_storage_path
                 audio_filename = job.audio_filename
-                lexicon_id = getattr(job, 'lexicon_id', None)
+                # Use 'general' lexicon by default if no lexicon_id specified
+                lexicon_id = getattr(job, 'lexicon_id', None) or 'general'
                 
                 log_with_context(
                     logger,
@@ -359,19 +361,43 @@ def process_transcription_job(job_id: str) -> None:
             cleanup_audio_file(audio_file_path, job_id)
             return
         
-        # Step 4: Call OpenAI service for transcription
+        # Step 4: Build Whisper prompt from lexicon
+        whisper_prompt = None
+        try:
+            with db_session_context() as session:
+                whisper_prompt = build_whisper_prompt_from_lexicon(lexicon_id, session)
+                log_with_context(
+                    logger,
+                    logging.INFO,
+                    f"Built Whisper prompt from lexicon",
+                    job_id=job_id,
+                    lexicon_id=lexicon_id,
+                    prompt_length=len(whisper_prompt)
+                )
+        except Exception as e:
+            log_with_context(
+                logger,
+                logging.WARNING,
+                f"Failed to build Whisper prompt, proceeding without it: {str(e)}",
+                job_id=job_id,
+                error_type=type(e).__name__
+            )
+            whisper_prompt = None  # Continue without prompt
+
+        # Step 5: Call OpenAI service for transcription
         original_text = None
         try:
             transcription_start = time()
-            original_text = transcribe_audio(str(audio_path))
+            original_text = transcribe_audio(str(audio_path), prompt=whisper_prompt)
             transcription_duration = time() - transcription_start
-            
+
             log_with_context(
                 logger,
                 logging.INFO,
                 f"OpenAI transcription completed",
                 job_id=job_id,
-                duration=transcription_duration
+                duration=transcription_duration,
+                used_prompt=whisper_prompt is not None
             )
         
         except OpenAIQuotaError as e:

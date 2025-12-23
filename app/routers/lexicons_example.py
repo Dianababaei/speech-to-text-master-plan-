@@ -14,7 +14,7 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models.lexicon_term import LexiconTerm
+from app.models.lexicon import LexiconTerm
 from app.services.lexicon_service import invalidate_lexicon_cache
 
 router = APIRouter(prefix="/lexicons", tags=["lexicons"])

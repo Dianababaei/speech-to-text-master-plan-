@@ -13,10 +13,29 @@ from sqlalchemy import func, and_
 import redis
 from sqlalchemy import func
 
-from app.models.lexicon_term import LexiconTerm
+from app.models.lexicon import LexiconTerm
 from app.schemas.lexicons import SkippedTerm
 
 logger = logging.getLogger(__name__)
+
+
+def load_lexicon_sync(lexicon_id: str, db: Session) -> Dict[str, str]:
+    """
+    Load lexicon terms from database synchronously.
+
+    Args:
+        lexicon_id: The lexicon ID to load terms from
+        db: Database session
+
+    Returns:
+        Dictionary mapping terms to their replacements
+    """
+    terms = db.query(LexiconTerm).filter(
+        LexiconTerm.lexicon_id == lexicon_id,
+        LexiconTerm.is_active == True
+    ).all()
+
+    return {term.term: term.replacement for term in terms}
 
 
 def validate_terms_for_import(
@@ -163,3 +182,50 @@ def export_terms_from_database(
     
     logger.info(f"Exported {len(exported_terms)} terms from lexicon '{lexicon_id}'")
     return exported_terms
+
+
+def build_whisper_prompt_from_lexicon(lexicon_id: str, db: Session, max_length: int = 224) -> str:
+    """
+    Build a Whisper prompt from lexicon replacement terms.
+
+    Whisper uses the prompt parameter to help with proper nouns, acronyms,
+    and domain-specific vocabulary. We extract the correct terms (replacement column)
+    from our lexicon to guide initial transcription.
+
+    Args:
+        lexicon_id: The lexicon ID to build prompt from
+        db: Database session
+        max_length: Maximum prompt length (Whisper limit is 224 tokens, ~224 chars for Persian)
+
+    Returns:
+        Comma-separated string of correct medical/domain terms
+    """
+    # Query active terms and get only the replacement (correct) terms
+    terms = db.query(LexiconTerm.replacement).filter(
+        LexiconTerm.lexicon_id == lexicon_id,
+        LexiconTerm.is_active == True
+    ).distinct().all()
+
+    # Extract replacement values and remove duplicates
+    unique_terms = list(set(term[0] for term in terms))
+
+    # Build comma-separated prompt
+    prompt_parts = []
+    current_length = 0
+
+    for term in unique_terms:
+        # Add term with comma and space
+        addition = f"{term}, "
+        addition_length = len(addition)
+
+        # Check if adding this term would exceed limit
+        if current_length + addition_length > max_length:
+            break
+
+        prompt_parts.append(term)
+        current_length += addition_length
+
+    prompt = ", ".join(prompt_parts)
+
+    logger.info(f"Built Whisper prompt from lexicon '{lexicon_id}': {len(prompt_parts)} terms, {len(prompt)} chars")
+    return prompt

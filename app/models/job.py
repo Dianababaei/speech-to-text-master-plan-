@@ -47,7 +47,7 @@ class Job(Base):
     error_message = Column(Text, nullable=True, comment='Error message if job failed')
 
     # Metadata
-    metadata = Column(JSONB, nullable=True, comment='Additional job metadata')
+    job_metadata = Column('metadata', JSONB, nullable=True, comment='Additional job metadata')
 
     # API key relationship
     api_key_id = Column(Integer, ForeignKey('api_keys.id', ondelete='SET NULL'), nullable=True, comment='API key used for this job')

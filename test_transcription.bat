@@ -35,7 +35,7 @@ echo Uploading: %MP3_FILE%
 echo Please wait...
 echo.
 
-curl -X POST "http://localhost:8080/jobs/" -H "X-API-Key: %API_KEY%" -F "audio_file=@%MP3_FILE%" -F "language=fa" > job_response.json
+curl -X POST "http://127.0.0.1:8080/jobs/" -H "X-API-Key: %API_KEY%" -F "audio_file=@%MP3_FILE%" -F "language=fa" > job_response.json
 echo.
 echo Response saved to job_response.json
 echo.
@@ -55,7 +55,7 @@ timeout /t 40 /nobreak
 echo.
 echo Fetching transcription result...
 echo ============================================
-curl "http://localhost:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%" > result.json
+curl "http://127.0.0.1:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%" > result.json
 
 echo.
 echo Result saved to result.json
@@ -73,7 +73,7 @@ echo   - Look for "original_text" field above - that's your Persian transcriptio
 echo.
 echo If status is "processing":
 echo   - Run this command again in 20 seconds:
-echo   curl "http://localhost:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%"
+echo   curl "http://127.0.0.1:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%"
 echo.
 echo If status is "failed":
 echo   - Check the "error_message" field for details

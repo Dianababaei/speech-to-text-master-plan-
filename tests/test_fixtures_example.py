@@ -46,7 +46,7 @@ def test_seeded_database(seed_test_database):
     """Test using fully seeded database."""
     from app.models.job import Job
     from app.models.api_key import ApiKey
-    from app.models.lexicon_term import LexiconTerm
+    from app.models.lexicon import LexiconTerm
     
     # Verify all entity types exist
     jobs = seed_test_database.query(Job).all()

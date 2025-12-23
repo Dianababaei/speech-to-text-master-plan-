@@ -51,13 +51,13 @@ Update the approval status of a user-submitted correction.
 ## Status Transition Rules
 
 Valid transitions:
-- `pending` → `approved` ✓
-- `pending` → `rejected` ✓
+- `pending` -> `approved` OK
+- `pending` -> `rejected` OK
 
 Invalid transitions:
-- `approved` → `rejected` ✗ (returns 400 error)
-- `rejected` → `approved` ✗ (returns 400 error)
-- `auto-approved` → any ✗ (returns 400 error)
+- `approved` -> `rejected` NOT OK (returns 400 error)
+- `rejected` -> `approved` NOT OK (returns 400 error)
+- `auto-approved` -> any NOT OK (returns 400 error)
 
 ## Authentication
 

@@ -5,7 +5,7 @@ echo ============================================
 echo.
 
 set API_KEY=1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I
-set API_URL=http://localhost:8080
+set API_URL=http://127.0.0.1:8080
 
 echo [1/4] Testing file: 63148.mp3
 echo.

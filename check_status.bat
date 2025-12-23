@@ -29,13 +29,13 @@ docker-compose ps
 
 echo.
 echo [4] Checking API health...
-curl -s http://localhost:8080/ >nul 2>&1
+curl -s http://127.0.0.1:8080/ >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ API not responding
     echo    Try: docker-compose restart web
 ) else (
     echo ✅ API responding
-    curl -s http://localhost:8080/
+    curl -s http://127.0.0.1:8080/
 )
 
 echo.

@@ -10,7 +10,7 @@ set /p AUDIO_FILE="Enter full path to your audio file: "
 echo.
 echo Step 1: Uploading audio file...
 echo ============================================
-curl -X POST "http://localhost:8080/jobs" -H "X-API-Key: %API_KEY%" -F "audio_file=@%AUDIO_FILE%" -F "language=fa" > temp_response.json
+curl -X POST "http://127.0.0.1:8080/jobs" -H "X-API-Key: %API_KEY%" -F "audio_file=@%AUDIO_FILE%" -F "language=fa" > temp_response.json
 
 echo.
 echo Response saved to temp_response.json
@@ -24,12 +24,12 @@ set /p JOB_ID="Enter the job_id from above response: "
 
 echo.
 echo Checking job status...
-curl "http://localhost:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%"
+curl "http://127.0.0.1:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%"
 
 echo.
 echo.
 echo ============================================
 echo To check status again, run:
-echo curl "http://localhost:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%"
+echo curl "http://127.0.0.1:8080/jobs/%JOB_ID%" -H "X-API-Key: %API_KEY%"
 echo ============================================
 pause

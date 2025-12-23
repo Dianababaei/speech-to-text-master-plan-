@@ -28,7 +28,7 @@ from app.models import Base
 from app.models.job import Job
 from app.models.feedback import Feedback
 from app.models.api_key import ApiKey
-from app.models.lexicon_term import LexiconTerm
+from app.models.lexicon import LexiconTerm
 
 # Import app components
 from app.database import get_db

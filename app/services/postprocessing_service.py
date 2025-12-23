@@ -6,7 +6,7 @@ text cleanup, and numeral handling with comprehensive error handling and fallbac
 """
 import re
 import traceback
-from typing import Optional
+from typing import Optional, Dict
 from sqlalchemy.orm import Session
 
 from app.utils.logging import get_logger
@@ -171,7 +171,7 @@ def apply_lexicon_replacements(text: str, lexicon_id: str, db: Session) -> str:
         logger.info(f"Applying lexicon replacements for lexicon_id: '{lexicon_id}'")
         
         # Load lexicon terms (from cache or database)
-        lexicon = load_lexicon_sync(db, lexicon_id)
+        lexicon = load_lexicon_sync(lexicon_id, db)
         
         if not lexicon:
             logger.warning(f"No lexicon terms found for lexicon_id '{lexicon_id}', returning original text")
@@ -348,7 +348,7 @@ class PostProcessingPipeline:
                 
                 if lexicon_id and db:
                     try:
-                        lexicon = load_lexicon_sync(db, lexicon_id)
+                        lexicon = load_lexicon_sync(lexicon_id, db)
                         
                         if lexicon:
                             self.logger.debug(

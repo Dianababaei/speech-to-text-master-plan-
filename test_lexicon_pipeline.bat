@@ -6,7 +6,7 @@ echo.
 
 set API_KEY=1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I
 set ADMIN_KEY=A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU
-set API_URL=http://localhost:8080
+set API_URL=http://127.0.0.1:8080
 
 echo [Step 1] Checking Radiology Lexicon in Database
 echo.

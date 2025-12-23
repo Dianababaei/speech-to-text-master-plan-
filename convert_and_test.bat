@@ -25,7 +25,7 @@ if /i "%choice%"=="y" (
     set /p mp3file="Enter path to MP3 file: "
     echo.
     echo Uploading...
-    curl -X POST "http://localhost:8080/jobs/" -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I" -F "audio_file=@%mp3file%" -F "language=fa" > temp_job.json
+    curl -X POST "http://127.0.0.1:8080/jobs/" -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I" -F "audio_file=@%mp3file%" -F "language=fa" > temp_job.json
     echo.
     echo Job created! Response saved to temp_job.json
     type temp_job.json
@@ -38,7 +38,7 @@ if /i "%choice%"=="y" (
     timeout /t 30 /nobreak
     echo.
     echo Checking status...
-    curl "http://localhost:8080/jobs/%job_id%" -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I"
+    curl "http://127.0.0.1:8080/jobs/%job_id%" -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I"
     echo.
     echo.
 )

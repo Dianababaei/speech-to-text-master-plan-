@@ -136,11 +136,12 @@ def _preserve_case(original: str, replacement: str) -> str:
 
 
 def apply_lexicon_corrections(
-    text: str, 
+    text: str,
     lexicon: Dict[str, str],
     enable_fuzzy_matching: bool = True,
-    fuzzy_match_threshold: int = 85
-) -> str:
+    fuzzy_match_threshold: int = 85,
+    return_metrics: bool = False
+) -> Tuple[str, Optional[Dict]]:
     """
     Apply lexicon-based term replacements to text with advanced features.
     
@@ -157,16 +158,25 @@ def apply_lexicon_corrections(
         lexicon: Dictionary of {term: replacement} pairs
         enable_fuzzy_matching: Enable fuzzy matching for near-matches
         fuzzy_match_threshold: Similarity threshold for fuzzy matching (0-100)
-        
+        return_metrics: If True, return (text, metrics_dict) instead of just text
+
     Returns:
-        Text with lexicon corrections applied
-        
+        If return_metrics=False: Text with lexicon corrections applied
+        If return_metrics=True: Tuple of (text, metrics_dict) where metrics contains:
+            - exact_replacements: Number of exact matches replaced
+            - fuzzy_replacements: Number of fuzzy matches replaced
+            - total_replacements: Total replacements made
+            - replacement_details: List of exact match details
+            - fuzzy_match_details: List of fuzzy match details
+
     Raises:
         PostProcessingError: If replacement fails
     """
     if not lexicon:
         logger.debug("Empty lexicon provided, returning original text")
-        return text
+        if return_metrics:
+            return text, {'exact_replacements': 0, 'fuzzy_replacements': 0, 'total_replacements': 0}
+        return text, None
     
     try:
         # Sort terms by length (longest first) for longest-match-first strategy
@@ -295,8 +305,19 @@ def apply_lexicon_corrections(
                 logger.debug(f"Fuzzy match details: {fuzzy_match_log}")
         else:
             logger.debug("No lexicon corrections applied (no exact or fuzzy matches found)")
-        
-        return processed_text
+
+        # Return with metrics if requested
+        if return_metrics:
+            metrics = {
+                'exact_replacements': exact_replacements_made,
+                'fuzzy_replacements': fuzzy_replacements_made,
+                'total_replacements': total_replacements,
+                'replacement_details': replacement_log,
+                'fuzzy_match_details': fuzzy_match_log
+            }
+            return processed_text, metrics
+
+        return processed_text, None
         
     except Exception as e:
         logger.error(f"Error applying lexicon corrections: {str(e)}")
@@ -343,12 +364,13 @@ def apply_lexicon_replacements(
             return text
         
         # Apply corrections with fuzzy matching configuration
-        return apply_lexicon_corrections(
-            text, 
+        corrected_text, _ = apply_lexicon_corrections(
+            text,
             lexicon,
             enable_fuzzy_matching=enable_fuzzy_matching,
             fuzzy_match_threshold=fuzzy_match_threshold
         )
+        return corrected_text
         
     except Exception as e:
         logger.error(f"{log_context}Failed to apply lexicon replacements for '{lexicon_id}': {str(e)}")
@@ -533,8 +555,8 @@ class PostProcessingPipeline:
                             )
                             
                             original_length = len(processed_text)
-                            processed_text = apply_lexicon_corrections(
-                                processed_text, 
+                            processed_text, _ = apply_lexicon_corrections(
+                                processed_text,
                                 lexicon,
                                 enable_fuzzy_matching=self.enable_fuzzy_matching,
                                 fuzzy_match_threshold=self.fuzzy_match_threshold
@@ -744,7 +766,7 @@ def process_transcription(
                 
                 # Apply corrections
                 try:
-                    corrected_text = apply_lexicon_corrections(current_text, lexicon)
+                    corrected_text, _ = apply_lexicon_corrections(current_text, lexicon)
                     current_text = corrected_text
                     successful_steps.append("lexicon_replacement")
                     
@@ -899,3 +921,97 @@ def process_transcription(
         )
     
     return final_text
+
+
+def calculate_confidence_score(
+    original_text: str,
+    corrected_text: str,
+    correction_count: int = 0,
+    fuzzy_match_count: int = 0
+) -> Tuple[float, Dict]:
+    """
+    Calculate confidence score for a transcription based on corrections applied.
+
+    Confidence scoring algorithm:
+    - Starts at 1.0 (100% confidence)
+    - Deducts points for each correction made
+    - More corrections = lower confidence
+    - Fuzzy matches reduce confidence more than exact matches
+
+    Args:
+        original_text: Original transcription text
+        corrected_text: Text after corrections
+        correction_count: Number of exact lexicon corrections applied
+        fuzzy_match_count: Number of fuzzy matches applied
+
+    Returns:
+        Tuple of (confidence_score, metrics_dict)
+        - confidence_score: Float between 0.0-1.0
+        - metrics_dict: Detailed breakdown of confidence calculation
+    """
+    word_count = len(original_text.split()) if original_text else 1
+
+    # Calculate correction ratio
+    total_corrections = correction_count + fuzzy_match_count
+    correction_ratio = total_corrections / word_count if word_count > 0 else 0
+
+    # Fuzzy matches are weighted more heavily (less confidence)
+    # Each exact correction reduces confidence by 0.02 (2%)
+    # Each fuzzy match reduces confidence by 0.05 (5%)
+    exact_penalty = correction_count * 0.02
+    fuzzy_penalty = fuzzy_match_count * 0.05
+    total_penalty = exact_penalty + fuzzy_penalty
+
+    # Calculate base confidence (starts at 1.0, reduced by penalties)
+    base_confidence = max(0.0, 1.0 - total_penalty)
+
+    # Apply correction ratio penalty (high ratio = lower confidence)
+    # If more than 20% of words needed correction, further reduce confidence
+    if correction_ratio > 0.2:
+        ratio_penalty = (correction_ratio - 0.2) * 0.5
+        base_confidence = max(0.0, base_confidence - ratio_penalty)
+
+    # Final confidence score (clamped to 0.0-1.0)
+    confidence_score = min(1.0, max(0.0, base_confidence))
+
+    # Build detailed metrics
+    metrics = {
+        'confidence_score': round(confidence_score, 4),
+        'word_count': word_count,
+        'correction_count': correction_count,
+        'fuzzy_match_count': fuzzy_match_count,
+        'total_corrections': total_corrections,
+        'correction_ratio': round(correction_ratio, 4),
+        'exact_penalty': round(exact_penalty, 4),
+        'fuzzy_penalty': round(fuzzy_penalty, 4),
+        'total_penalty': round(total_penalty, 4),
+        'quality_tier': _get_quality_tier(confidence_score)
+    }
+
+    logger.info(
+        f"Confidence score calculated: {confidence_score:.2%} "
+        f"(corrections: {total_corrections}/{word_count} words, "
+        f"tier: {metrics['quality_tier']})"
+    )
+
+    return confidence_score, metrics
+
+
+def _get_quality_tier(confidence_score: float) -> str:
+    """
+    Get quality tier label based on confidence score.
+
+    Tiers:
+    - Excellent: 0.95-1.0 (few/no corrections needed)
+    - Good: 0.85-0.95 (minor corrections)
+    - Fair: 0.70-0.85 (moderate corrections)
+    - Poor: <0.70 (many corrections needed)
+    """
+    if confidence_score >= 0.95:
+        return "excellent"
+    elif confidence_score >= 0.85:
+        return "good"
+    elif confidence_score >= 0.70:
+        return "fair"
+    else:
+        return "poor"

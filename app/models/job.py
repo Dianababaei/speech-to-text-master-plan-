@@ -43,6 +43,12 @@ class Job(Base):
     # Processing metrics
     processing_time_seconds = Column(Float, nullable=True, comment='Total processing time')
 
+    # Confidence scoring
+    confidence_score = Column(Float, nullable=True, comment='Overall confidence score (0.0-1.0)')
+    correction_count = Column(Integer, nullable=True, comment='Number of corrections applied')
+    fuzzy_match_count = Column(Integer, nullable=True, comment='Number of fuzzy matches used')
+    confidence_metrics = Column(JSONB, nullable=True, comment='Detailed confidence breakdown')
+
     # Error tracking
     error_message = Column(Text, nullable=True, comment='Error message if job failed')
 

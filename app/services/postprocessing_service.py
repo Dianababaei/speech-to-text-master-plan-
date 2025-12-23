@@ -6,8 +6,10 @@ text cleanup, and numeral handling with comprehensive error handling and fallbac
 """
 import re
 import traceback
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 from sqlalchemy.orm import Session
+
+from rapidfuzz import fuzz
 
 from app.utils.logging import get_logger
 from app.services.lexicon_service import load_lexicon_sync
@@ -18,6 +20,78 @@ logger = get_logger(__name__)
 class PostProcessingError(Exception):
     """Base exception for post-processing errors."""
     pass
+
+
+def _calculate_similarity_score(word1: str, word2: str) -> float:
+    """
+    Calculate similarity score between two words using token set ratio.
+    
+    Uses rapidfuzz's token set ratio which handles word order and partial matches better
+    than simple string distance. Returns a score from 0-100.
+    
+    Args:
+        word1: First word to compare
+        word2: Second word to compare
+        
+    Returns:
+        Similarity score as percentage (0-100)
+    """
+    return fuzz.token_set_ratio(word1.lower(), word2.lower())
+
+
+def _find_fuzzy_match(
+    word: str,
+    lexicon: Dict[str, str],
+    threshold: int = 85
+) -> Tuple[Optional[str], float]:
+    """
+    Find the best fuzzy match for a word in the lexicon.
+    
+    Evaluates all terms in the lexicon and returns the best match if it exceeds
+    the threshold. Logs all candidates at DEBUG level for troubleshooting.
+    
+    Args:
+        word: The word to match
+        lexicon: Dictionary of lexicon terms to search
+        threshold: Minimum similarity score (0-100) to consider as a match
+        
+    Returns:
+        Tuple of (best_matching_term, similarity_score) or (None, 0) if no match found
+    """
+    best_match = None
+    best_score = 0
+    candidates = []
+    
+    # Evaluate all lexicon terms
+    for term in lexicon.keys():
+        score = _calculate_similarity_score(word, term)
+        candidates.append((term, score))
+        
+        # Track if this is the best match so far
+        if score > best_score:
+            best_score = score
+            best_match = term
+    
+    # Log all candidates at DEBUG level for troubleshooting
+    logger.debug(
+        f"Fuzzy match evaluation for '{word}': "
+        f"evaluated {len(candidates)} lexicon term(s)"
+    )
+    
+    for term, score in sorted(candidates, key=lambda x: x[1], reverse=True)[:5]:
+        logger.debug(
+            f"  Fuzzy candidate: '{term}' (score: {score}%)"
+        )
+    
+    # Filter by threshold
+    if best_score < threshold:
+        logger.debug(
+            f"Fuzzy match for '{word}' below threshold "
+            f"(best: {best_match} at {best_score}%, threshold: {threshold}%)"
+        )
+        return None, 0
+    
+    return best_match, best_score
 
 
 def _preserve_case(original: str, replacement: str) -> str:
@@ -61,7 +135,12 @@ def _preserve_case(original: str, replacement: str) -> str:
         return replacement
 
 
-def apply_lexicon_corrections(text: str, lexicon: Dict[str, str]) -> str:
+def apply_lexicon_corrections(
+    text: str, 
+    lexicon: Dict[str, str],
+    enable_fuzzy_matching: bool = True,
+    fuzzy_match_threshold: int = 85
+) -> str:
     """
     Apply lexicon-based term replacements to text with advanced features.
     
@@ -71,10 +150,13 @@ def apply_lexicon_corrections(text: str, lexicon: Dict[str, str]) -> str:
     - Whole-word matching with word boundaries
     - Unicode-safe for Persian/English mixed text
     - Comprehensive logging for debugging
+    - Optional fuzzy matching for near-matches
     
     Args:
         text: The text to process
         lexicon: Dictionary of {term: replacement} pairs
+        enable_fuzzy_matching: Enable fuzzy matching for near-matches
+        fuzzy_match_threshold: Similarity threshold for fuzzy matching (0-100)
         
     Returns:
         Text with lexicon corrections applied
@@ -89,11 +171,16 @@ def apply_lexicon_corrections(text: str, lexicon: Dict[str, str]) -> str:
     try:
         # Sort terms by length (longest first) for longest-match-first strategy
         sorted_terms = sorted(lexicon.items(), key=lambda x: len(x[0]), reverse=True)
-        logger.debug(f"Processing {len(sorted_terms)} lexicon terms (longest-match-first)")
+        logger.debug(
+            f"Processing {len(sorted_terms)} lexicon terms (longest-match-first), "
+            f"fuzzy_matching={'enabled' if enable_fuzzy_matching else 'disabled'}"
+        )
         
         processed_text = text
-        replacements_made = 0
+        exact_replacements_made = 0
+        fuzzy_replacements_made = 0
         replacement_log = []
+        fuzzy_match_log = []
         
         # Apply each term replacement with word boundary matching (case-insensitive)
         for term, replacement in sorted_terms:
@@ -102,7 +189,7 @@ def apply_lexicon_corrections(text: str, lexicon: Dict[str, str]) -> str:
             # that handles Persian/English boundaries
             pattern = r'(?<!\w)' + re.escape(term) + r'(?!\w)'
             
-            # Find all matches to log them
+            # Find all exact matches to log them
             matches = list(re.finditer(pattern, processed_text, flags=re.IGNORECASE | re.UNICODE))
             
             if matches:
@@ -119,28 +206,95 @@ def apply_lexicon_corrections(text: str, lexicon: Dict[str, str]) -> str:
                     flags=re.IGNORECASE | re.UNICODE
                 )
                 
-                replacements_made += len(matches)
+                exact_replacements_made += len(matches)
                 replacement_log.append({
                     'term': term,
                     'replacement': replacement,
                     'count': len(matches),
+                    'match_type': 'exact',
                     'positions': [match.span() for match in matches]
                 })
                 
                 logger.debug(
-                    f"Replaced '{term}' → '{replacement}' "
+                    f"Exact match: '{term}' → '{replacement}' "
                     f"({len(matches)} occurrence{'s' if len(matches) > 1 else ''})"
                 )
         
-        # Log summary
-        if replacements_made > 0:
+        # Apply fuzzy matching if enabled
+        if enable_fuzzy_matching:
+            # Split text into words for fuzzy matching on unmatched words
+            # We need to find words that weren't already matched exactly
+            words = re.findall(r'\b[\w]+\b', processed_text, flags=re.UNICODE)
+            
+            # Check each unique word for fuzzy matches
+            seen_words = set()
+            for word in words:
+                if word.lower() in seen_words:
+                    continue
+                seen_words.add(word.lower())
+                
+                # Skip if word is already in lexicon (exact match)
+                if any(word.lower() == term.lower() for term in lexicon.keys()):
+                    continue
+                
+                # Try to find a fuzzy match
+                fuzzy_term, fuzzy_score = _find_fuzzy_match(
+                    word,
+                    lexicon,
+                    threshold=fuzzy_match_threshold
+                )
+                
+                if fuzzy_term:
+                    # Found a fuzzy match, replace all occurrences of the word
+                    fuzzy_replacement = lexicon[fuzzy_term]
+                    pattern = r'(?<!\w)' + re.escape(word) + r'(?!\w)'
+                    
+                    # Count occurrences before replacement
+                    matches = list(re.finditer(pattern, processed_text, flags=re.IGNORECASE | re.UNICODE))
+                    
+                    if matches:
+                        # Apply replacement with case preservation
+                        def replace_with_case_preservation_fuzzy(match):
+                            original = match.group(0)
+                            preserved_replacement = _preserve_case(original, fuzzy_replacement)
+                            return preserved_replacement
+                        
+                        processed_text = re.sub(
+                            pattern,
+                            replace_with_case_preservation_fuzzy,
+                            processed_text,
+                            flags=re.IGNORECASE | re.UNICODE
+                        )
+                        
+                        fuzzy_replacements_made += len(matches)
+                        fuzzy_match_log.append({
+                            'original_word': word,
+                            'matched_term': fuzzy_term,
+                            'replacement': fuzzy_replacement,
+                            'score': fuzzy_score,
+                            'count': len(matches)
+                        })
+                        
+                        # Log each fuzzy match at INFO level
+                        logger.info(
+                            f"Fuzzy match: '{word}' → '{fuzzy_replacement}' "
+                            f"(matched term: '{fuzzy_term}', score: {fuzzy_score}%)"
+                        )
+        
+        # Log summary with both exact and fuzzy match counts
+        total_replacements = exact_replacements_made + fuzzy_replacements_made
+        if total_replacements > 0:
             logger.info(
-                f"Applied {replacements_made} lexicon correction(s) "
-                f"from {len([r for r in replacement_log if r['count'] > 0])} unique term(s)"
+                f"Lexicon replacement completed: "
+                f"{exact_replacements_made} exact match(es), "
+                f"{fuzzy_replacements_made} fuzzy match(es), "
+                f"{total_replacements} total replacement(s) applied"
             )
-            logger.debug(f"Replacement details: {replacement_log}")
+            logger.debug(f"Exact match details: {replacement_log}")
+            if fuzzy_match_log:
+                logger.debug(f"Fuzzy match details: {fuzzy_match_log}")
         else:
-            logger.debug("No lexicon corrections applied (no matches found)")
+            logger.debug("No lexicon corrections applied (no exact or fuzzy matches found)")
         
         return processed_text
         
@@ -149,7 +303,14 @@ def apply_lexicon_corrections(text: str, lexicon: Dict[str, str]) -> str:
         raise PostProcessingError(f"Failed to apply lexicon corrections: {str(e)}")
 
 
-def apply_lexicon_replacements(text: str, lexicon_id: str, db: Session) -> str:
+def apply_lexicon_replacements(
+    text: str, 
+    lexicon_id: str, 
+    db: Session,
+    enable_fuzzy_matching: bool = True,
+    fuzzy_match_threshold: int = 85,
+    job_id: Optional[str] = None
+) -> str:
     """
     Apply lexicon replacements to text by loading the specified lexicon.
     
@@ -160,6 +321,9 @@ def apply_lexicon_replacements(text: str, lexicon_id: str, db: Session) -> str:
         text: The text to process
         lexicon_id: The lexicon identifier to load and apply
         db: Database session for loading lexicon terms
+        enable_fuzzy_matching: Enable fuzzy matching for near-matches
+        fuzzy_match_threshold: Similarity threshold for fuzzy matching (0-100)
+        job_id: Optional job ID for logging context
         
     Returns:
         Text with lexicon replacements applied
@@ -168,20 +332,26 @@ def apply_lexicon_replacements(text: str, lexicon_id: str, db: Session) -> str:
         PostProcessingError: If lexicon loading or processing fails
     """
     try:
-        logger.info(f"Applying lexicon replacements for lexicon_id: '{lexicon_id}'")
+        log_context = f"[Job {job_id}] " if job_id else ""
+        logger.info(f"{log_context}Applying lexicon replacements for lexicon_id: '{lexicon_id}'")
         
         # Load lexicon terms (from cache or database)
         lexicon = load_lexicon_sync(lexicon_id, db)
         
         if not lexicon:
-            logger.warning(f"No lexicon terms found for lexicon_id '{lexicon_id}', returning original text")
+            logger.warning(f"{log_context}No lexicon terms found for lexicon_id '{lexicon_id}', returning original text")
             return text
         
-        # Apply corrections
-        return apply_lexicon_corrections(text, lexicon)
+        # Apply corrections with fuzzy matching configuration
+        return apply_lexicon_corrections(
+            text, 
+            lexicon,
+            enable_fuzzy_matching=enable_fuzzy_matching,
+            fuzzy_match_threshold=fuzzy_match_threshold
+        )
         
     except Exception as e:
-        logger.error(f"Failed to apply lexicon replacements for '{lexicon_id}': {str(e)}")
+        logger.error(f"{log_context}Failed to apply lexicon replacements for '{lexicon_id}': {str(e)}")
         raise PostProcessingError(f"Failed to apply lexicon replacements: {str(e)}")
 
 
@@ -282,7 +452,9 @@ class PostProcessingPipeline:
         self,
         enable_lexicon_replacement: bool = True,
         enable_text_cleanup: bool = True,
-        enable_numeral_handling: bool = True
+        enable_numeral_handling: bool = True,
+        enable_fuzzy_matching: bool = True,
+        fuzzy_match_threshold: int = 85
     ):
         """
         Initialize the pipeline with step configuration.
@@ -291,10 +463,14 @@ class PostProcessingPipeline:
             enable_lexicon_replacement: Enable lexicon-based term replacement
             enable_text_cleanup: Enable text cleanup and normalization
             enable_numeral_handling: Enable numeral handling
+            enable_fuzzy_matching: Enable fuzzy matching for lexicon corrections
+            fuzzy_match_threshold: Similarity threshold for fuzzy matching (0-100)
         """
         self.enable_lexicon_replacement = enable_lexicon_replacement
         self.enable_text_cleanup = enable_text_cleanup
         self.enable_numeral_handling = enable_numeral_handling
+        self.enable_fuzzy_matching = enable_fuzzy_matching
+        self.fuzzy_match_threshold = fuzzy_match_threshold
         
         self.logger = get_logger(__name__)
     
@@ -357,7 +533,12 @@ class PostProcessingPipeline:
                             )
                             
                             original_length = len(processed_text)
-                            processed_text = apply_lexicon_corrections(processed_text, lexicon)
+                            processed_text = apply_lexicon_corrections(
+                                processed_text, 
+                                lexicon,
+                                enable_fuzzy_matching=self.enable_fuzzy_matching,
+                                fuzzy_match_threshold=self.fuzzy_match_threshold
+                            )
                             
                             step_duration = time() - step_start
                             self.logger.info(
@@ -463,7 +644,9 @@ class PostProcessingPipeline:
 def create_pipeline(
     enable_lexicon_replacement: Optional[bool] = None,
     enable_text_cleanup: Optional[bool] = None,
-    enable_numeral_handling: Optional[bool] = None
+    enable_numeral_handling: Optional[bool] = None,
+    enable_fuzzy_matching: Optional[bool] = None,
+    fuzzy_match_threshold: Optional[int] = None
 ) -> PostProcessingPipeline:
     """
     Create a post-processing pipeline with configuration.
@@ -474,6 +657,8 @@ def create_pipeline(
         enable_lexicon_replacement: Override for lexicon replacement step
         enable_text_cleanup: Override for text cleanup step
         enable_numeral_handling: Override for numeral handling step
+        enable_fuzzy_matching: Override for fuzzy matching feature
+        fuzzy_match_threshold: Override for fuzzy matching threshold
         
     Returns:
         Configured PostProcessingPipeline instance
@@ -481,13 +666,17 @@ def create_pipeline(
     from app.config import (
         ENABLE_LEXICON_REPLACEMENT,
         ENABLE_TEXT_CLEANUP,
-        ENABLE_NUMERAL_HANDLING
+        ENABLE_NUMERAL_HANDLING,
+        ENABLE_FUZZY_MATCHING,
+        FUZZY_MATCH_THRESHOLD
     )
     
     return PostProcessingPipeline(
         enable_lexicon_replacement=enable_lexicon_replacement if enable_lexicon_replacement is not None else ENABLE_LEXICON_REPLACEMENT,
         enable_text_cleanup=enable_text_cleanup if enable_text_cleanup is not None else ENABLE_TEXT_CLEANUP,
         enable_numeral_handling=enable_numeral_handling if enable_numeral_handling is not None else ENABLE_NUMERAL_HANDLING,
+        enable_fuzzy_matching=enable_fuzzy_matching if enable_fuzzy_matching is not None else ENABLE_FUZZY_MATCHING,
+        fuzzy_match_threshold=fuzzy_match_threshold if fuzzy_match_threshold is not None else FUZZY_MATCH_THRESHOLD,
     )
 
 

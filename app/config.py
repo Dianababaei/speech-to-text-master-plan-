@@ -41,6 +41,10 @@ ENABLE_LEXICON_REPLACEMENT = os.getenv("ENABLE_LEXICON_REPLACEMENT", "true").low
 ENABLE_TEXT_CLEANUP = os.getenv("ENABLE_TEXT_CLEANUP", "true").lower() in ("true", "1", "yes")
 ENABLE_NUMERAL_HANDLING = os.getenv("ENABLE_NUMERAL_HANDLING", "true").lower() in ("true", "1", "yes")
 
+# Fuzzy matching configuration
+ENABLE_FUZZY_MATCHING = os.getenv("ENABLE_FUZZY_MATCHING", "true").lower() in ("true", "1", "yes")
+FUZZY_MATCH_THRESHOLD = int(os.getenv("FUZZY_MATCH_THRESHOLD", "85"))
+
 # Settings object for backward compatibility
 class _Settings:
     """Simple settings object for access to configuration values."""
@@ -64,5 +68,13 @@ class _Settings:
     @property
     def enable_numeral_handling(self):
         return ENABLE_NUMERAL_HANDLING
+    
+    @property
+    def enable_fuzzy_matching(self):
+        return ENABLE_FUZZY_MATCHING
+    
+    @property
+    def fuzzy_match_threshold(self):
+        return FUZZY_MATCH_THRESHOLD
 
 settings = _Settings()

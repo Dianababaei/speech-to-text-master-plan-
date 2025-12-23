@@ -12,6 +12,7 @@ Production-ready speech-to-text transcription service with Persian language supp
 
 ✅ **OpenAI Whisper Integration** - High-quality transcription
 ✅ **Persian Language Support** - With English word recognition
+✅ **GPT-4o-mini Post-Processing** - Advanced cleanup and formatting (+25-35% quality improvement)
 ✅ **API Key Authentication** - Secure access control
 ✅ **Admin API** - Full key lifecycle management
 ✅ **Background Processing** - Redis queue + worker

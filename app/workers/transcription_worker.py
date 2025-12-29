@@ -240,14 +240,17 @@ def process_transcription_job(job_id: str) -> None:
                 audio_filename = job.audio_filename
                 # Use 'general' lexicon by default if no lexicon_id specified
                 lexicon_id = getattr(job, 'lexicon_id', None) or 'general'
-                
+                # Get language for Whisper transcription
+                language = getattr(job, 'language', None)
+
                 log_with_context(
                     logger,
                     logging.INFO,
                     f"Job loaded from database",
                     job_id=job_id,
                     status=job.status,
-                    file_path=audio_file_path
+                    file_path=audio_file_path,
+                    language=language
                 )
             
             except JobNotFoundError as e:
@@ -388,7 +391,11 @@ def process_transcription_job(job_id: str) -> None:
         original_text = None
         try:
             transcription_start = time()
-            original_text = transcribe_audio(str(audio_path), prompt=whisper_prompt)
+            original_text = transcribe_audio(
+                str(audio_path),
+                language=language,
+                prompt=whisper_prompt
+            )
             transcription_duration = time() - transcription_start
 
             log_with_context(
@@ -397,6 +404,7 @@ def process_transcription_job(job_id: str) -> None:
                 f"OpenAI transcription completed",
                 job_id=job_id,
                 duration=transcription_duration,
+                language=language,
                 used_prompt=whisper_prompt is not None
             )
         
@@ -548,6 +556,7 @@ def process_transcription_job(job_id: str) -> None:
         
         # Step 6: Trigger post-processing pipeline
         processed_text = None
+        confidence_metrics = None
 
         try:
             postproc_start = time()
@@ -557,7 +566,7 @@ def process_transcription_job(job_id: str) -> None:
 
             # Process with database session for lexicon lookup
             with db_session_context() as session:
-                processed_text = pipeline.process(
+                processed_text, confidence_metrics = pipeline.process(
                     original_text,
                     lexicon_id=lexicon_id,
                     db=session,
@@ -571,7 +580,10 @@ def process_transcription_job(job_id: str) -> None:
                 logging.INFO,
                 f"Post-processing completed",
                 job_id=job_id,
-                duration=postproc_duration
+                duration=postproc_duration,
+                correction_count=confidence_metrics.get('correction_count', 0) if confidence_metrics else 0,
+                fuzzy_match_count=confidence_metrics.get('fuzzy_match_count', 0) if confidence_metrics else 0,
+                confidence_score=confidence_metrics.get('confidence_score', 0.0) if confidence_metrics else 0.0
             )
 
             # If post-processing returns None or empty string, fall back to original
@@ -583,6 +595,7 @@ def process_transcription_job(job_id: str) -> None:
                     job_id=job_id
                 )
                 processed_text = original_text
+                confidence_metrics = None
 
         except PostProcessingError as e:
             # Post-processing failure is not fatal - we still have original_text
@@ -594,6 +607,7 @@ def process_transcription_job(job_id: str) -> None:
                 error_type="PostProcessingError"
             )
             processed_text = original_text
+            confidence_metrics = None
 
         except Exception as e:
             # Unexpected post-processing error
@@ -606,16 +620,29 @@ def process_transcription_job(job_id: str) -> None:
             )
             # Fall back to original text
             processed_text = original_text
+            confidence_metrics = None
         
-        # Step 7: Update job to completed
+        # Step 7: Update job to completed with processed text and confidence metrics
         # Note: transcription_text is already saved in Step 5
-        # Post-processing is not yet implemented, so processed_text is not used
         try:
+            # Prepare update data
+            update_data = {
+                "processed_text": processed_text
+            }
+
+            # Add confidence metrics if available
+            if confidence_metrics:
+                update_data["correction_count"] = confidence_metrics.get('correction_count', 0)
+                update_data["fuzzy_match_count"] = confidence_metrics.get('fuzzy_match_count', 0)
+                update_data["confidence_score"] = confidence_metrics.get('confidence_score', None)
+                update_data["confidence_metrics"] = confidence_metrics.get('confidence_metrics', None)
+
             with db_session_context() as session:
                 update_job_status(
                     job_id,
                     "completed",
-                    session=session
+                    session=session,
+                    **update_data
                 )
             
             total_duration = time() - start_time

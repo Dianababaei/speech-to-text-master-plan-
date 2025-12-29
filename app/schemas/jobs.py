@@ -44,7 +44,7 @@ class JobCreateResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     """
     Response model for job status retrieval.
-    
+
     Represents the current state of a transcription job including
     timestamps, status, and results (if available).
     """
@@ -55,6 +55,11 @@ class JobStatusResponse(BaseModel):
     original_text: Optional[str] = Field(None, description="Original transcribed text (null for pending/processing jobs)")
     processed_text: Optional[str] = Field(None, description="Post-processed transcription text (null for pending/processing jobs)")
     error_message: Optional[str] = Field(None, description="Error message if job failed (null otherwise)")
+
+    # Confidence scoring fields
+    correction_count: Optional[int] = Field(None, description="Number of lexicon corrections applied")
+    fuzzy_match_count: Optional[int] = Field(None, description="Number of fuzzy matches used")
+    confidence_score: Optional[float] = Field(None, description="Overall confidence score (0.0-1.0)")
 
     class Config:
         """Pydantic configuration."""

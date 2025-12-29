@@ -1,545 +1,230 @@
-# Speech-to-Text System - Complete Quick Start Guide
+# Quick Start Guide
 
-Complete guide to get your Persian speech-to-text transcription system up and running.
-
----
-
-## Table of Contents
-
-1. [System Overview](#system-overview)
-2. [Prerequisites](#prerequisites)
-3. [Initial Setup](#initial-setup)
-4. [Start Services](#start-services)
-5. [Transcribe Audio](#transcribe-audio)
-6. [Admin API Management](#admin-api-management)
-7. [View Results](#view-results)
-8. [Troubleshooting](#troubleshooting)
-
----
-
-## System Overview
-
-**What you have:**
-- ✅ FastAPI web service (port 8080)
-- ✅ PostgreSQL database
-- ✅ Redis queue system
-- ✅ Background worker for transcription
-- ✅ OpenAI Whisper API integration
-- ✅ API key authentication system
-- ✅ Admin API for key management
-- ✅ Persian language support with English words
-- ✅ **Automatic transcription file saving** - Each transcription is saved as a `.txt` file
-
-**Your Credentials:**
-- **Admin Key:** `A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU`
-- **Client API Key:** `1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I`
-
----
+Get your Persian medical speech-to-text system running in 5 minutes.
 
 ## Prerequisites
 
-✅ You already have:
-- Docker Desktop running
-- All services configured
-- Database initialized
-- API keys generated
+- Docker Desktop installed and running
+- OpenAI API key ([Get one here](https://platform.openai.com/api-keys))
 
----
+## Step 1: Setup (2 minutes)
 
-## Initial Setup
+```bash
+# 1. Configure environment
+cp .env.example .env
 
-### 1. Verify Docker is Running
+# 2. Edit .env and add your OpenAI API key
+# OPENAI_API_KEY=sk-...your-key-here
 
-```cmd
-docker --version
-docker-compose --version
+# 3. Start all services
+docker-compose up -d
+
+# 4. Wait 10 seconds for services to initialize
 ```
 
-### 2. Check Services Status
+## Step 2: Verify (30 seconds)
 
-```cmd
-cd "c:\Users\digi kaj\Desktop\speech-to-text\speech-to-text-master-plan-"
+```bash
+# Check all services are running
 docker-compose ps
+
+# You should see 4 services "Up":
+# - web (FastAPI)
+# - db (PostgreSQL)
+# - redis
+# - worker
 ```
 
-You should see 4 services running:
-- `db` (PostgreSQL)
-- `redis` (Queue)
-- `web` (API server)
-- `worker` (Transcription processor)
+## Step 3: Test It! (2 minutes)
+
+### Submit an Audio File
+
+```bash
+curl -X POST "http://localhost:8080/jobs/" \
+  -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I" \
+  -F "audio_file=@C:\path\to\your\audio.mp3" \
+  -F "language=fa"
+```
+
+**You'll get a response like:**
+```json
+{
+  "job_id": "abc123-def456-...",
+  "status": "pending"
+}
+```
+
+### Check the Result
+
+Wait 10-30 seconds (depending on audio length), then:
+
+```bash
+curl -X GET "http://localhost:8080/jobs/abc123-def456-..." \
+  -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I"
+```
+
+**When completed:**
+```json
+{
+  "status": "completed",
+  "original_text": "raw whisper output...",
+  "processed_text": "cleaned, formatted output...",
+  "confidence_score": 0.85
+}
+```
+
+### Find Your Transcription File
+
+Automatically saved to:
+```
+transcriptions/your_audio_filename.txt
+```
 
 ---
 
-## Start Services
+## Common Commands
 
-### If Services Are Not Running
-
-```cmd
-cd "c:\Users\digi kaj\Desktop\speech-to-text\speech-to-text-master-plan-"
+### Start Services
+```bash
 docker-compose up -d
 ```
 
-### Restart Services
-
-```cmd
-docker-compose restart
-```
-
 ### Stop Services
-
-```cmd
+```bash
 docker-compose down
 ```
 
 ### View Logs
+```bash
+# All services
+docker-compose logs -f
 
-```cmd
-# Web API logs
-docker-compose logs web --tail=30
+# Specific service
+docker-compose logs -f worker
+docker-compose logs -f web
+```
 
-# Worker logs
-docker-compose logs worker --tail=30
-
-# All logs
-docker-compose logs --tail=50
+### Restart Worker (after config changes)
+```bash
+docker-compose restart worker
 ```
 
 ---
 
-## Transcribe Audio
+## Windows Users - Easy Batch File Testing
 
-### Option 1: Use the Automated Script
+We've included test batch files:
 
-```cmd
-test_fixed.bat
-```
+```batch
+# Test 3 audio files with language comparison
+compare_new_3_files.bat
 
-This will:
-1. Upload your MP3 file
-2. Wait for processing
-3. Display results
-
-### Option 2: Manual Commands
-
-#### Step 1: Upload Audio File
-
-**Important:** Audio must be in MP3 format.
-
-```cmd
-curl -X POST "http://localhost:8080/jobs/" ^
-  -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I" ^
-  -F "audio_file=@C:\Users\digi kaj\Downloads\YOUR_FILE.mp3" ^
-  -F "language=fa"
-```
-
-**Response:**
-```json
-{
-  "job_id": "abc123-def456-...",
-  "status": "pending",
-  "created_at": "2025-12-03T10:00:00Z"
-}
-```
-
-**Copy the `job_id` from the response!**
-
-#### Step 2: Wait for Processing
-
-Wait 30-60 seconds for the transcription to complete.
-
-#### Step 3: Check Result
-
-```cmd
-curl "http://localhost:8080/jobs/YOUR_JOB_ID" ^
-  -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I"
-```
-
-**Response (Processing):**
-```json
-{
-  "job_id": "abc123...",
-  "status": "processing",
-  "created_at": "2025-12-03T10:00:00Z",
-  "completed_at": null,
-  "original_text": null,
-  "processed_text": null,
-  "error_message": null
-}
-```
-
-**Response (Completed):**
-```json
-{
-  "job_id": "abc123...",
-  "status": "completed",
-  "created_at": "2025-12-03T10:00:00Z",
-  "completed_at": "2025-12-03T10:00:35Z",
-  "original_text": "شکی با برشی 6218 سینوس یک جهته بدون تدریب...",
-  "processed_text": "شکی با برشی 6218 سینوس یک جهته بدون تدریب...",
-  "error_message": null
-}
-```
-
-### Convert M4A to MP3 (If Needed)
-
-Your M4A files need conversion to MP3 first.
-
-**Option 1: Online Converter (Easiest)**
-1. Go to: https://cloudconvert.com/m4a-to-mp3
-2. Upload your M4A file
-3. Click Convert
-4. Download the MP3
-
-**Option 2: FFmpeg (If Installed)**
-```cmd
-ffmpeg -i "input.m4a" "output.mp3"
+# Test 5 audio files with FA vs AUTO language modes
+compare_language_modes.bat
 ```
 
 ---
 
-## Admin API Management
+## API Endpoints
 
-Manage API keys using the admin endpoints.
+**Base URL:** `http://localhost:8080`
 
-### 1. List All API Keys
+**Admin API Key:** `1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I`
 
-```cmd
-curl -X GET "http://localhost:8080/admin/api-keys" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
+### Submit Job
+```
+POST /jobs/
+Headers: X-API-Key
+Form-data: audio_file, language (optional, default: "fa")
 ```
 
-**With Filters:**
-```cmd
-# Only active keys
-curl -X GET "http://localhost:8080/admin/api-keys?is_active=true" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
-
-# Only inactive keys
-curl -X GET "http://localhost:8080/admin/api-keys?is_active=false" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
-
-# Pagination
-curl -X GET "http://localhost:8080/admin/api-keys?limit=5&offset=0" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
+### Get Job Status
+```
+GET /jobs/{job_id}
+Headers: X-API-Key
 ```
 
-### 2. Create New API Key
-
-```cmd
-curl -X POST "http://localhost:8080/admin/api-keys" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"project_name\": \"My New Project\", \"description\": \"Production key\", \"rate_limit\": 1000}"
+### List All Jobs
+```
+GET /jobs/
+Headers: X-API-Key
+Query params: skip, limit, status
 ```
 
-**⚠️ Important:** Save the returned API key immediately - it's shown only once!
-
-**Response:**
-```json
-{
-  "api_key": "f0zZkGWpNlekr1381aQCbGNUHjlQnhaIVK3wph044PM",
-  "key_id": 3,
-  "project_name": "My New Project",
-  "rate_limit": 1000,
-  "created_at": "2025-12-03T10:00:00Z",
-  "warning": "This API key will only be shown once..."
-}
-```
-
-### 3. Update API Key
-
-```cmd
-# Update rate limit
-curl -X PATCH "http://localhost:8080/admin/api-keys/1" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"rate_limit\": 2000}"
-
-# Update multiple fields
-curl -X PATCH "http://localhost:8080/admin/api-keys/1" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"project_name\": \"Updated Name\", \"rate_limit\": 1500, \"is_active\": true}"
-```
-
-### 4. Delete (Deactivate) API Key
-
-```cmd
-curl -X DELETE "http://localhost:8080/admin/api-keys/1" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
-```
-
-**Note:** This is a soft delete (sets `is_active=false`). Keys can be reactivated using PATCH.
-
-### 5. Admin Health Check
-
-```cmd
-curl -X GET "http://localhost:8080/admin/health" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
-```
+### Interactive API Documentation
+Open in browser: **http://localhost:8080/docs**
 
 ---
 
-## View Results
+## Quality Tips
 
-### Option 1: Text Files (Recommended - Best for Persian)
+### 🎤 Best Audio Quality
+- Use a good microphone (USB headset recommended)
+- Quiet environment (close windows, turn off fans)
+- Speak clearly at normal pace
+- High-quality audio files (WAV or 320kbps MP3)
 
-**All transcriptions are automatically saved as `.txt` files in the `transcriptions/` folder!**
+### 📝 Customize for Your Practice
 
-Each audio file gets a corresponding text file:
-- `63148.mp3` → `transcriptions/63148.txt`
-- `63322.mp3` → `transcriptions/63322.txt`
+**Add Custom Medical Terms:**
 
-**How to view:**
-1. Open File Explorer
-2. Navigate to: `c:\Users\digi kaj\Desktop\speech-to-text\speech-to-text-master-plan-\transcriptions\`
-3. Open any `.txt` file with Notepad, VS Code, or any text editor
-
-**List all transcription files:**
-```cmd
-dir transcriptions
+Edit `medical_corrections.csv`:
+```csv
+term,replacement,category
+your_term,correct_term,medical_term
 ```
 
-### Option 2: From API Response
-
-The transcription appears in the `original_text` field when status is "completed".
-
-### Option 3: From Database
-
-**View specific job:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT transcription_text FROM jobs WHERE job_id = 'YOUR_JOB_ID';"
-```
-
-**View most recent transcription:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT job_id, status, transcription_text, created_at FROM jobs ORDER BY created_at DESC LIMIT 1;"
-```
-
-**View last 5 transcriptions:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT job_id, LEFT(transcription_text, 50) as preview, created_at FROM jobs ORDER BY created_at DESC LIMIT 5;"
-```
-
-**View all API keys:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT id, name, is_active, rate_limit, created_at FROM api_keys;"
-```
-
-**View all jobs:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT job_id, status, language, audio_filename, created_at FROM jobs ORDER BY created_at DESC LIMIT 10;"
+Then restart worker:
+```bash
+docker-compose restart worker
 ```
 
 ---
 
 ## Troubleshooting
 
-### Services Not Running
+### Services Won't Start
+```bash
+# Check what's wrong
+docker-compose logs web
+docker-compose logs worker
 
-**Check status:**
-```cmd
-docker-compose ps
-```
-
-**Restart all services:**
-```cmd
-docker-compose restart
-```
-
-**View logs for errors:**
-```cmd
-docker-compose logs --tail=50
-```
-
-### Job Stays "Pending" Too Long
-
-**Check worker is running:**
-```cmd
-docker-compose logs worker --tail=30
-```
-
-**Restart worker:**
-```cmd
-docker-compose restart worker
-```
-
-### "Invalid API key" Error
-
-**Verify your API key:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT id, name, is_active FROM api_keys;"
-```
-
-**If needed, create a new key:**
-```cmd
-curl -X POST "http://localhost:8080/admin/api-keys" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"project_name\": \"New Key\", \"rate_limit\": 1000}"
-```
-
-### M4A Files Rejected
-
-Convert to MP3 first using:
-- Online: https://cloudconvert.com/m4a-to-mp3
-- FFmpeg: `ffmpeg -i input.m4a output.mp3`
-
-### Database Connection Issues
-
-**Restart database:**
-```cmd
-docker-compose restart db
-```
-
-**Check database logs:**
-```cmd
-docker-compose logs db --tail=30
-```
-
-### View All System Logs
-
-```cmd
-# Web service
-docker-compose logs web --tail=50
-
-# Worker
-docker-compose logs worker --tail=50
-
-# Database
-docker-compose logs db --tail=30
-
-# Redis
-docker-compose logs redis --tail=30
-
-# All services
-docker-compose logs --tail=100
-```
-
----
-
-## Complete Workflow Example
-
-### Example: Transcribe a Persian Audio File
-
-**1. Convert audio to MP3 (if needed)**
-- Visit https://cloudconvert.com/m4a-to-mp3
-- Upload your M4A file
-- Download the MP3
-
-**2. Upload for transcription**
-```cmd
-curl -X POST "http://localhost:8080/jobs/" ^
-  -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I" ^
-  -F "audio_file=@C:\Users\digi kaj\Downloads\63218.mp3" ^
-  -F "language=fa"
-```
-
-**3. Copy the job_id from response**
-Example: `"job_id": "3d11a2e8-1a90-47ac-8840-c40a3a2717be"`
-
-**4. Wait 30-60 seconds**
-
-**5. Check result**
-```cmd
-curl "http://localhost:8080/jobs/3d11a2e8-1a90-47ac-8840-c40a3a2717be" ^
-  -H "X-API-Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I"
-```
-
-**6. View Persian text properly**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT transcription_text FROM jobs WHERE job_id = '3d11a2e8-1a90-47ac-8840-c40a3a2717be';"
-```
-
-**Result:**
-```
-شکی با برشی 6218 سینوس یک جهته بدون تدریب انحرافی سپتامی بینی به چپ همراه به اسپور فارمیشن OMU در دو طرف نرو یه نفس استخدامات مخاطب جوزی در سینس مارک زیلای راست بقیهش هم نرمال
-```
-
----
-
-## Quick Reference
-
-### Your Credentials
-```
-Admin Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU
-Client API Key: 1CBAJxlf5-b_s6-d9a5lwQ2zSUtamVFI5RHHCm8Bp4I
-Base URL: http://localhost:8080
-```
-
-### Common Commands
-
-**Start services:**
-```cmd
+# Common fix: restart everything
+docker-compose down
 docker-compose up -d
 ```
 
-**Stop services:**
-```cmd
-docker-compose down
+### Jobs Stay "pending"
+```bash
+# Check worker is running
+docker-compose ps worker
+
+# Restart worker
+docker-compose restart worker
 ```
 
-**Restart services:**
-```cmd
-docker-compose restart
-```
-
-**View logs:**
-```cmd
-docker-compose logs --tail=50
-```
-
-**Transcribe audio:**
-```cmd
-test_fixed.bat
-```
-
-**List API keys:**
-```cmd
-curl -X GET "http://localhost:8080/admin/api-keys" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
-```
-
-**View recent transcriptions:**
-```cmd
-docker-compose exec db psql -U user -d transcription -c "SELECT job_id, LEFT(transcription_text, 50) as preview, created_at FROM jobs ORDER BY created_at DESC LIMIT 5;"
-```
+### Low Quality Results
+1. Check audio quality (most common issue!)
+2. Look at `confidence_score` in results (<0.5 = poor audio)
+3. Add custom terms to `medical_corrections.csv`
 
 ---
 
-## System Status
+## Next Steps
 
-✅ **All systems operational:**
-- FastAPI web service on port 8080
-- PostgreSQL database
-- Redis queue system
-- Background worker processing
-- OpenAI Whisper API integration
-- API key authentication
-- Admin API management
-- Persian transcription with English words
-- Audio file storage and cleanup
-
-Your speech-to-text system is ready to use! 🎉
+1. **Read the full documentation**: [README.md](README.md)
+2. **Customize lexicon**: Add your medical terms to `medical_corrections.csv`
+3. **Test with real audio**: Try your actual radiology reports
+4. **Monitor quality**: Check confidence scores and adjust
 
 ---
 
-## Support
+## Need Help?
 
-**Check system health:**
-```cmd
-curl http://localhost:8080/
-curl http://localhost:8080/health
-curl "http://localhost:8080/admin/health" ^
-  -H "X-Admin-Key: A-R_BZ52dg1C9yymHj9566gGMjFCVaaqe0Nis9FX1QU"
-```
+- **Full Documentation**: [README.md](README.md)
+- **API Docs**: http://localhost:8080/docs
+- **Test Files**: See `*.bat` files for testing examples
 
-**View all services:**
-```cmd
-docker-compose ps
-```
+---
 
-**Restart everything:**
-```cmd
-docker-compose restart
-```
+**That's it! You're ready to transcribe Persian medical audio! 🎉**

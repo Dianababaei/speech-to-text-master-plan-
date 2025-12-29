@@ -324,6 +324,8 @@ def apply_lexicon_corrections(
                 'exact_replacements': exact_replacements_made,
                 'fuzzy_replacements': fuzzy_replacements_made,
                 'total_replacements': total_replacements,
+                'correction_count': exact_replacements_made,  # Alias for pipeline compatibility
+                'fuzzy_match_count': fuzzy_replacements_made,  # Alias for pipeline compatibility
                 'replacement_details': replacement_log,
                 'fuzzy_match_details': fuzzy_match_log
             }
@@ -536,37 +538,129 @@ def apply_gpt_cleanup(text: str) -> str:
         # 3. Establish critical constraints to preserve all medical information
         # 4. Provide concrete examples for better accuracy
         # 5. Ensure output is clean text without meta-commentary
-        system_prompt = """You are an expert Persian medical transcription editor specialized in transforming raw medical dictation into professional, accurate medical reports.
+        system_prompt = """You are an expert Persian radiology transcription editor. Your goal is to FIX ONLY OBVIOUS SPELLING ERRORS while PRESERVING the speaker's exact medical terminology and findings.
 
-Your task is to clean and format raw medical dictation text while preserving all medical information.
+**CRITICAL EXAMPLES - Learn from these actual Whisper errors:**
 
-Guidelines:
-1. GRAMMAR & SPELLING: Fix Persian grammar and spelling errors while maintaining medical terminology
-2. MEDICAL TERMINOLOGY: Correct common medical transcription errors:
-   - گایش → کاهش (decrease)
-   - جن و وروس → ژنوواروس (genome virus)
-   - حرارت → (fever - keep medical context)
-   - Other medical terms should be corrected based on context
-3. REMOVE ARTIFACTS: Remove dictation artifacts and conversational phrases:
-   - 'دیگه چی داره؟' (what else?)
-   - 'آرتش فوری' (urgent dictation markers)
-   - Hesitations, false starts, and conversational fillers
-4. FORMAL LANGUAGE: Apply formal medical report language:
-   - 'نظر می کند' → 'مشاهده می‌شود' (observed)
-   - First person conversational → professional passive voice
-   - Informal descriptions → medical terminology
-5. FORMATTING:
-   - Apply proper Persian punctuation
-   - Use ZWNJ (zero-width non-joiner, ‌) for proper word boundaries in Persian
-   - Use parentheses for patient IDs and reference numbers
-   - Proper line breaks for readability
-6. CRITICAL: Preserve all medical information - Do NOT:
-   - Add findings not present in original text
-   - Infer diagnoses not mentioned
-   - Remove or alter any medical data
-   - Change medical values, measurements, or dates
+Bad: "الهارافه از شکل سپتومو بینی مشروع دارد" → Good: "انحراف سپتوم بینی مشاهده می‌شود"
+Bad: "افصایی سخامت جزگی مخاطی در سیموس اعتمایی دال سانتا راست" → Good: "ضخامت جزئی مخاطی در سینوس اتموئید راست مشاهده می‌شود"
+Bad: "یک جهته بدون تذریب" → Good: "یک جهته بدون تزریق"
+Bad: "کونکابولوزایی تربینه های میانی دو طرف را گرد می کردند" → Good: "کونکابولوس توربینیت میانی دوطرف مشاهده می‌شود"
+Bad: "یک نفس استخدامات مخاطب جوزی در سینس مارکزیداری راست" → Good: "ضخامت جزئی مخاطی در سینوس ماگزیلاری راست مشاهده می‌شود"
+Bad: "انحرافی سبتانه بینی به چپ همراه با سپور فارمیشن" → Good: "انحراف سپتوم بینی به چپ همراه با اسپور فورمیشن"
+Bad: "OMU در دو طرف نرو" → Good: "OMC در دو طرف نرو"
+Bad: "سینوس یک جهته بدون تذریب" → Good: "سینوس یک جهت بدون تزریق" (remove "ه" from "یک جهته")
+Bad: "آتلکتازی در پارکاردیاک دو طرف" → Good: "آتلکتازی در پارکاردیاک دوطرف" (remove ه from دوطرفه)
+Bad: "کانسولیدیشن در ریوئل" → Good: "کانسولیدیشن در RUL" (keep English abbreviations)
 
-Output only the cleaned text without any explanations or commentary."""
+**CRITICAL RULES FOR DIRECTIONAL TERMS - REMOVE FINAL "ه":**
+When you see directional terms ending in "ه", remove it:
+- "دو جهته" or "دوجه هد" → "دو جهت"
+- "دوطرفه" or "دو طرفه" → "دوطرف"
+- "یک جهته" → "یک جهت"
+- "یک‌طرفه" → "یک‌طرف"
+- This rule applies to ALL directional/location terms ending in "ه"
+
+**CONVERT PHONETIC PERSIAN TO ENGLISH ABBREVIATIONS:**
+Whisper often transcribes English medical abbreviations phonetically in Persian. Convert them back to English:
+- "ریوئل" or "ار یو ال" → RUL
+- "ار ال ال" → RLL
+- "ار ام ال" → RML
+- "ال یو ال" → LUL
+- "ال ال ال" → LLL
+- "ای اس دی" or "اس ای دی" → SAD or ASD (context-dependent)
+- "او ام سی" or "او ام یو" → OMC
+- Any phonetic spelling of English abbreviations → Convert to English letters
+
+**PRESERVE ENGLISH TERMS:**
+Keep ALL English medical terms in ENGLISH:
+- HRCT, CT, MRI (already in English - keep as-is)
+- consolidation, pneumonia, atelectasis, posterior (keep in English if present)
+
+**ABSOLUTELY FORBIDDEN CHANGES:**
+- If you see "نرو" → OUTPUT "نرو" (DO NOT change to "نرمال" or "تنگ"!)
+- If you see "narrow" → OUTPUT "narrow" (DO NOT change to "تنگ"!)
+
+CRITICAL PRESERVATION RULES - Follow these STRICTLY:
+YOUR PRIMARY GOAL IS TO PRESERVE, NOT TO "IMPROVE" OR STANDARDIZE!
+
+- PRESERVE speaker's terminology choices - keep "narrow", "نرو", "یک جهته", "نرمال", or ANY original medical terms EXACTLY as-is
+- NEVER change medical findings (unilateral/bilateral, open/narrow/stenotic, present/absent)
+- NEVER standardize terminology:
+  * Do NOT change "یک جهته" to "یک‌طرفه" (both mean unilateral, keep original)
+  * Do NOT change "نرو" to "نرمال" or "تنگ" (keep as speaker said it)
+  * Do NOT change "narrow" to "تنگ" (keep English as-is)
+- NEVER standardize mixed English/Persian terms (keep "narrow", "consolidation", "pneumonia" as-is)
+- ONLY fix obvious garbled spellings in Persian words where the word is clearly wrong:
+  * "تذریب"→"تزریق" (wrong spelling → correct spelling)
+  * "سیموس"→"سینوس" (garbled → correct)
+  * "OMU"→"OMC" (wrong abbreviation → correct abbreviation)
+- When in doubt, preserve the original text exactly - PRESERVATION IS MORE IMPORTANT THAN STANDARDIZATION
+
+IMPORTANT: This is RAW voice dictation with errors. Fix ONLY:
+- Obvious garbled Persian words (refer to examples above)
+- Patient ID formatting (remove periods/dashes, add parentheses)
+- Hallucinated or nonsense text (remove based on context)
+- Dictation artifacts and filler words (delete completely)
+- DO NOT change medical terminology or findings
+
+Common PERSIAN Transcription Errors to Fix (from actual files):
+- خاندگ → خانوادگی, سانوگرافی → سونوگرافی, کنترست → کنتراست
+- گولو بوس/گلو بوس → گلوبوس, کلتفیکاسیون → کلسیفیکاسیون
+- سکریننگ → اسکرینینگ, دنسیدی → دانسیته, مارجن → مارژین
+- پستانه → پستان, تایب → تایپ, رویعت → رؤیت
+- می شود → می‌شود (add ZWNJ), می قدرت → می‌شود, می قدرد → می‌شود
+- هر دو → دوطرف, یه → یک, دو سینی → دوطرف سینوس
+- صحبه/صحنه → سابقه, نگتیو/نگتی → منفی, پوزیتیو → مثبت
+- دپوزیشن → رسوب, متالیک/میتالیک → فلزی
+- هایپردنس → پرتراکم, هایپردنسیتی → پرتراکمی
+- گایش → کاهش, مانده → همراه, اینش → آن
+- جن و وروس → ژنوواروس, سیموس → سینوس, ساپلکسشن → سابلوکسیشن
+- دیژنراتیف → دژنراتیو, کنکابولوزو/کونکابولزایی → کونکابولوس
+- زخامت/سخامت → ضخامت, دال سانتا → راست, رویف → خفیف
+- اعتمایی → اتموئید, استقانی → استخوانی, کوکسیکسش → کوکسیکس
+- برونشیولید → برونشیولیت, میکرو آسپیراسیان → میکروآسپیراسیون
+- آتلکتاتیک → آتلکتازی, ساکران → ساکروم, مولاهای → مفاصل
+- سطون مغره → ستون فقرات, استوپنی → اسپوندیلوز, نورمان → نرمال
+- انهاراف → انحراف, هوادار شدن → حفره شدن
+- DO NOT convert English terms: keep "consolidation", "pneumonia", "atelectasis", "posterior", "narrow" as-is
+
+Remove ALL Dictation Artifacts and Conversational Fillers:
+- 'رو ای بزنید و ببینیم' → DELETE (conversational filler)
+- 'اگه خواهیدون فعلشو درست بزارید' → DELETE (conversational artifact)
+- 'دیگه چی داره؟' → DELETE
+- 'مطرح کنیم دیگه' → 'مطرح‌کننده'
+- 'به نیستید', 'ای دیاستان' → DELETE or fix to 'است'
+- 'دارم' → 'دارد', 'نظر می کند' → 'مشاهده می‌شود'
+- 'می کنید' → 'می‌کند'
+- 'یک جمعه' (meaningless word) → DELETE if nonsensical in context
+- ANY conversational filler words, hesitations, repeated words, informal speech patterns
+
+Fix Hallucinated/Garbage Text:
+- Random letters or nonsense (like "EcuHRCT") → DELETE or fix to proper term (HRCT)
+- Obvious gibberish that makes no sense → remove
+- Keep all actual words even if they seem unusual - they may be the speaker's terminology choice
+
+Patient ID Formatting:
+- Keep 6-digit format in parentheses: "526.22" → "(526622)" or "(۵۲۶۲۲)"
+- Remove periods/dashes, make consistent
+
+Professional Formatting:
+- Use proper Persian punctuation and ZWNJ (‌)
+- Organize: Patient name and ID on first line, modality on second line (HRCT:, CT:), findings after
+- Use periods to separate findings
+- Professional passive voice, formal medical language
+
+CRITICAL Rules:
+1. Fix ONLY obvious Persian transcription/spelling errors (garbled words like "تذریب"→"تزریق")
+2. NEVER change medical findings (unilateral→bilateral, narrow→open, etc.)
+3. PRESERVE speaker's exact terminology - keep mixed English/Persian as-is ("narrow", "consolidation", etc.)
+4. Do NOT add medical findings that aren't mentioned
+5. Do NOT infer test results or diagnoses
+6. Preserve all actual medical data (measurements, locations, observations)
+7. When uncertain whether something is an error or intentional terminology, preserve it
+
+Output ONLY the corrected text, nothing else."""
         
         # Log API call attempt
         logger.info("GPT cleanup: Calling GPT-4o-mini API for text cleanup")
@@ -583,7 +677,14 @@ Output only the cleaned text without any explanations or commentary."""
                 },
                 {
                     "role": "user",
-                    "content": f"Please clean and format the following medical dictation:\n\n{text}"
+                    "content": f"""Fix ONLY obvious spelling errors. DO NOT change or standardize medical terminology.
+
+CRITICAL: If the input contains "یک جهته", you MUST output "یک جهته" (not "یک‌طرفه").
+CRITICAL: If the input contains "نرو", you MUST output "نرو" (not "نرمال" or "تنگ").
+
+Text to clean:
+
+{text}"""
                 }
             ]
         )
@@ -791,29 +892,39 @@ class PostProcessingPipeline:
         )
         
         processed_text = text
-        
+
+        # Initialize metrics tracking
+        total_correction_count = 0
+        total_fuzzy_match_count = 0
+
         try:
             # Step 1: Apply lexicon replacements
             if self.enable_lexicon_replacement:
                 step_start = time()
-                
+
                 if lexicon_id and db:
                     try:
                         lexicon = load_lexicon_sync(lexicon_id, db)
-                        
+
                         if lexicon:
                             self.logger.debug(
                                 f"Loaded {len(lexicon)} lexicon terms",
                                 extra={**log_context, "lexicon_id": lexicon_id, "term_count": len(lexicon)}
                             )
-                            
+
                             original_length = len(processed_text)
-                            processed_text, _ = apply_lexicon_corrections(
+                            processed_text, lexicon_metrics = apply_lexicon_corrections(
                                 processed_text,
                                 lexicon,
                                 enable_fuzzy_matching=self.enable_fuzzy_matching,
-                                fuzzy_match_threshold=self.fuzzy_match_threshold
+                                fuzzy_match_threshold=self.fuzzy_match_threshold,
+                                return_metrics=True
                             )
+
+                            # Track correction counts
+                            if lexicon_metrics:
+                                total_correction_count += lexicon_metrics.get('correction_count', 0)
+                                total_fuzzy_match_count += lexicon_metrics.get('fuzzy_match_count', 0)
                             
                             step_duration = time() - step_start
                             self.logger.info(
@@ -908,6 +1019,14 @@ class PostProcessingPipeline:
             else:
                 self.logger.debug(f"Step 4: GPT cleanup disabled", extra=log_context)
             
+            # Calculate confidence score
+            confidence_score, confidence_metrics = calculate_confidence_score(
+                original_text=text,
+                corrected_text=processed_text,
+                correction_count=total_correction_count,
+                fuzzy_match_count=total_fuzzy_match_count
+            )
+
             # Log pipeline exit
             pipeline_duration = time() - pipeline_start
             self.logger.info(
@@ -919,10 +1038,19 @@ class PostProcessingPipeline:
                     "processed_length": len(processed_text),
                     "original_words": len(text.split()),
                     "processed_words": len(processed_text.split()),
+                    "correction_count": total_correction_count,
+                    "fuzzy_match_count": total_fuzzy_match_count,
+                    "confidence_score": confidence_score,
                 }
             )
-            
-            return processed_text
+
+            # Return tuple of (processed_text, metrics_dict)
+            return processed_text, {
+                'correction_count': total_correction_count,
+                'fuzzy_match_count': total_fuzzy_match_count,
+                'confidence_score': confidence_score,
+                'confidence_metrics': confidence_metrics
+            }
             
         except Exception as e:
             pipeline_duration = time() - pipeline_start

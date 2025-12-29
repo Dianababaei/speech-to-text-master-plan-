@@ -1,0 +1,240 @@
+term,replacement,category
+گایش,کاهش,medical_term
+جن و وروس,ژنوواروس,medical_term
+جن و نظر می کند,ژنو نظر می‌کند,medical_term
+کنکابولوزو,کونکابولوس,medical_term
+کنکابولزایی,کونکابولوس,medical_term
+توربینیت,توربینیت,medical_term
+سیموس,سینوس,medical_term
+اعتمایی,اتموئید,medical_term
+زخامت,ضخامت,medical_term
+سخامت,ضخامت,medical_term
+دال سانتا,دکستر,medical_term
+رویف,خفیف,medical_term
+ساپلکسشن,سابلوکسیشن,medical_term
+داستیت,سیستیت,medical_term
+استقانی,استخوانی,medical_term
+کوکسیکسش,کوکسیکس,medical_term
+دیژنراتیف,دژنراتیو,medical_term
+سطون مغره,ستون فقرات,medical_term
+استوپنی,اسپوندیلوز,medical_term
+مولاهای,مفاصل,medical_term
+ساکران,ساکروم,medical_term
+آتلکتاتیک,آتلکتازی,medical_term
+میکرو آسپیراسیان,میکروآسپیراسیون,medical_term
+برونشیولید,برونشیولیت,medical_term
+مطرح کنیم دیگه,مطرح‌کننده,cleanup_artifact
+دیگه چی داره,‌,cleanup_artifact
+به نیستید,‌,cleanup_artifact
+مانده,همراه,medical_term
+موساویه,مساوی,medical_term
+اسیدی,سایز,medical_term
+ای دیاستان,است,cleanup_artifact
+اینش,آن,cleanup_artifact
+نورمان,نرمال,medical_term
+دوجه هد,دو جهت,medical_term
+انهاراف,انحراف,medical_term
+هوادار شدن,حفره شدن,medical_term
+انتریار کلینوید پروسیس,انتریور کلینوئید پروسس,medical_term
+مطرح کنیم دیگه,مطرح‌کننده,cleanup_artifact
+# Lung Lobe Abbreviations
+ریوئل,RUL,medical_term
+ار یو ال,RUL,medical_term
+ار ال ال,RLL,medical_term
+ار ام ال,RML,medical_term
+ال یو ال,LUL,medical_term
+ال ال ال,LLL,medical_term
+# Cardiac/Anatomical Measurements
+ای اس دی,ASD,medical_term
+اس ای دی,SAD,medical_term
+او ام سی,OMC,medical_term
+او ام یو,OMU,medical_term
+# Imaging Modalities
+سی تی,CT,medical_term
+ام ار آی,MRI,medical_term
+اچ آر سی تی,HRCT,medical_term
+اکس ری,X-ray,medical_term
+سی تی اسکن,CT scan,medical_term
+ام آر آی,MRI,medical_term
+# MRI Sequences
+تی یک,T1,medical_term
+تی دو,T2,medical_term
+تی وان,T1,medical_term
+تی تو,T2,medical_term
+فلیر,FLAIR,medical_term
+دی دبلیو آی,DWI,medical_term
+دی ڤی آی,DWI,medical_term
+ای دی سی,ADC,medical_term
+اس دبلیو آی,SWI,medical_term
+# Anatomical Directions/Planes
+ای پی,AP,medical_term
+لت,LAT,medical_term
+پی ای,PA,medical_term
+اس آی,SI,medical_term
+ام ال,ML,medical_term
+# Vertebrae - Cervical
+سی یک,C1,medical_term
+سی دو,C2,medical_term
+سی سه,C3,medical_term
+سی چهار,C4,medical_term
+سی پنج,C5,medical_term
+سی شش,C6,medical_term
+سی هفت,C7,medical_term
+سی وان,C1,medical_term
+سی تو,C2,medical_term
+سی تری,C3,medical_term
+سی فور,C4,medical_term
+سی فایو,C5,medical_term
+سی سیکس,C6,medical_term
+سی سون,C7,medical_term
+# Vertebrae - Thoracic
+تی یک,T1,medical_term
+تی دو,T2,medical_term
+تی سه,T3,medical_term
+تی چهار,T4,medical_term
+تی پنج,T5,medical_term
+تی شش,T6,medical_term
+تی هفت,T7,medical_term
+تی هشت,T8,medical_term
+تی نه,T9,medical_term
+تی ده,T10,medical_term
+تی یازده,T11,medical_term
+تی دوازده,T12,medical_term
+تی وان,T1,medical_term
+تی تو,T2,medical_term
+تی تری,T3,medical_term
+تی فور,T4,medical_term
+تی فایو,T5,medical_term
+تی سیکس,T6,medical_term
+تی سون,T7,medical_term
+تی ایت,T8,medical_term
+تی ناین,T9,medical_term
+تی تن,T10,medical_term
+تی الون,T11,medical_term
+تی توولو,T12,medical_term
+# Vertebrae - Lumbar
+ال یک,L1,medical_term
+ال دو,L2,medical_term
+ال سه,L3,medical_term
+ال چهار,L4,medical_term
+ال پنج,L5,medical_term
+ال وان,L1,medical_term
+ال تو,L2,medical_term
+ال تری,L3,medical_term
+ال فور,L4,medical_term
+ال فایو,L5,medical_term
+# Vertebrae - Sacral
+اس یک,S1,medical_term
+اس دو,S2,medical_term
+اس سه,S3,medical_term
+اس چهار,S4,medical_term
+اس پنج,S5,medical_term
+اس وان,S1,medical_term
+اس تو,S2,medical_term
+اس تری,S3,medical_term
+اس فور,S4,medical_term
+اس فایو,S5,medical_term
+# Common Clinical Abbreviations
+پی ای,PE,medical_term
+پی تی ای,PTE,medical_term
+دی وی تی,DVT,medical_term
+سی اچ اف,CHF,medical_term
+سی او پی دی,COPD,medical_term
+آر دی اس,RDS,medical_term
+آر ال,RL,medical_term
+ال ال,LL,medical_term
+یو ال,UL,medical_term
+یو آر,UR,medical_term
+# Body Regions/Systems
+سی ان اس,CNS,medical_term
+جی آی,GI,medical_term
+جی یو,GU,medical_term
+ام اس کی,MSK,medical_term
+# Common Pathology Abbreviations
+او ای,OA,medical_term
+آر ای,RA,medical_term
+سی آر پی,CRP,medical_term
+ای اس آر,ESR,medical_term
+# Contrast/Imaging Terms
+آی وی,IV,medical_term
+پی او,PO,medical_term
+آی ام,IM,medical_term
+پی آر,PR,medical_term
+# Measurements
+سی ام,cm,medical_term
+ام ام,mm,medical_term
+کی جی,kg,medical_term
+ام جی,mg,medical_term
+# Time Abbreviations
+اچ آر,HR,medical_term
+بی پی ام,BPM,medical_term
+# Skull/Brain Regions
+پی سی ای,PCA,medical_term
+ام سی ای,MCA,medical_term
+ای سی ای,ACA,medical_term
+# Sinus Abbreviations
+ام اس,MS,medical_term
+اف اس,FS,medical_term
+ای اس,ES,medical_term
+اس اس,SS,medical_term
+# Common Persian Transcription Errors (from actual files)
+خاندگ,خانوادگی,medical_term
+سانوگرافی,سونوگرافی,medical_term
+سانوگراف,سونوگرافی,medical_term
+کنترست,کنتراست,medical_term
+گولو بوس,گلوبوس,medical_term
+گلو بوس,گلوبوس,medical_term
+کلتفیکاسیون,کلسیفیکاسیون,medical_term
+کلسفیکاسیون,کلسیفیکاسیون,medical_term
+سکریننگ,اسکرینینگ,medical_term
+دنسیدی,دانسیته,medical_term
+دنسیته,دانسیته,medical_term
+مارجن,مارژین,medical_term
+مارژن,مارژین,medical_term
+اندیستینگ,نامشخص,medical_term
+پستانه,پستان,medical_term
+تایب,تایپ,medical_term
+رویعت,رؤیت,medical_term
+رویت,رؤیت,medical_term
+می شود,می‌شود,cleanup_artifact
+می قدرت,می‌شود,cleanup_artifact
+می قدرد,می‌شود,cleanup_artifact
+می کنید,می‌کند,cleanup_artifact
+هر دو,دوطرف,medical_term
+یه,یک,cleanup_artifact
+دو سینی,دوطرف سینوس,medical_term
+صحبه,سابقه,medical_term
+صحنه,سابقه,medical_term
+نگتیو,منفی,medical_term
+نگتی,منفی,medical_term
+پوزیتیو,مثبت,medical_term
+دپوزیشن,رسوب,medical_term
+متالیک,فلزی,medical_term
+میتالیک,فلزی,medical_term
+هایپردنس,پرتراکم,medical_term
+هایپردنسیتی,پرتراکمی,medical_term
+اسپور فورمیشن,اسپور,medical_term
+کونکابولوس,کونکابولوس,medical_term
+کونکابولزایی,کونکابولوس,medical_term
+کنکابولوزو,کونکابولوس,medical_term
+برونشیولید,برونشیولیت,medical_term
+میکرو آسپیراسیان,میکروآسپیراسیون,medical_term
+آتلکتاتیک,آتلکتازی,medical_term
+ساکران,ساکروم,medical_term
+مولاهای,مفاصل,medical_term
+دال سانتا,راست,medical_term
+سیموس,سینوس,medical_term
+اعتمایی,اتموئید,medical_term
+زخامت,ضخامت,medical_term
+سخامت,ضخامت,medical_term
+رویف,خفیف,medical_term
+ساپلکسشن,سابلوکسیشن,medical_term
+داستیت,سیستیت,medical_term
+استقانی,استخوانی,medical_term
+کوکسیکسش,کوکسیکس,medical_term
+دیژنراتیف,دژنراتیو,medical_term
+سطون مغره,ستون فقرات,medical_term
+استوپنی,اسپوندیلوز,medical_term
+نورمان,نرمال,medical_term
+انهاراف,انحراف,medical_term
+هوادار شدن,حفره شدن,medical_term

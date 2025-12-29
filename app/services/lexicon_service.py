@@ -217,14 +217,20 @@ def build_whisper_prompt_from_lexicon(lexicon_id: str, db: Session, max_length: 
     # 3. Persian medical writing style
     # 4. Proper spacing and punctuation
 
-    prompt = """بیمار: فاطمه رشیدی ۶۲۲۶۸
-یافته‌ها: کاهش فاصله مفصلی در زانوی راست. ضخامت جزئی مخاطی در سینوس اتموئید. تغییرات دژنراتیو در ستون فقرات کمری. کبد و طحال در اندازه طبیعی. ریه‌ها عاری از کانسولیدیشن و آتلکتازی."""
+    # Use a prompt that demonstrates:
+    # 1. Patient names with IDs
+    # 2. Medical terminology in Persian (correct spellings)
+    # 3. English abbreviations preserved (CT, HRCT, RUL, MRI, etc.)
+    # 4. Professional medical report style with proper grammar
+    # 5. Common medical terms like سینوس، انحراف، ضخامت، سونوگرافی
+    prompt = """نفیسه رضازاده 63148
+CT سینوس: انحراف سپتوم بینی به چپ. کونکابولوس توربینیت میانی دوطرف. OMC باز. ضخامت جزئی مخاطی در سینوس ماگزیلاری راست. سونوگرافی پستان."""
 
-    # Ensure we don't exceed max length
+    # Ensure we don't exceed max length (224 chars)
     if len(prompt) > max_length:
         # Fallback to shorter version if needed
-        prompt = """بیمار: محمد احمدی ۵۲۶۲۲
-یافته: کاهش فاصله مفصلی زانو. ضخامت مخاطی سینوس. تغییرات دژنراتیو ستون فقرات. کبد و طحال طبیعی."""
+        prompt = """نفیسه رضازاده 63148
+CT سینوس: انحراف سپتوم بینی. کونکابولوس توربینیت. ضخامت مخاطی راست."""
 
     logger.info(f"Built example-based Whisper prompt from lexicon '{lexicon_id}': {len(prompt)} chars (style: medical report)")
     return prompt

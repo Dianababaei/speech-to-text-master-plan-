@@ -38,6 +38,7 @@ class Job(Base):
 
     # Transcription results
     transcription_text = Column(Text, nullable=True, comment='Raw transcription output')
+    processed_text = Column(Text, nullable=True, comment='Post-processed transcription output')
     lexicon_version = Column(String(50), nullable=True, comment='Version of lexicon used')
 
     # Processing metrics

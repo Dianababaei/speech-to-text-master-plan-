@@ -117,7 +117,7 @@ async def get_job_status(
     
     # Query the job by job_id AND api_key_id to ensure authorization
     job = db.query(Job).filter(
-        Job.id == str(job_id),
+        Job.job_id == str(job_id),
         Job.api_key_id == api_key.id
     ).first()
     
@@ -131,20 +131,32 @@ async def get_job_status(
     # Map database model to response schema with proper null handling
     # For pending/processing jobs, transcription_text should be null
     # For failed jobs, error_message should be populated
-    transcription_text = None
+    original_text = None
+    processed_text = None
+    correction_count = None
+    fuzzy_match_count = None
+    confidence_score = None
+
     if job.status in [JobStatus.COMPLETED.value]:
-        transcription_text = job.transcription_text
+        original_text = job.transcription_text
+        processed_text = job.processed_text if job.processed_text else job.transcription_text
+        correction_count = job.correction_count
+        fuzzy_match_count = job.fuzzy_match_count
+        confidence_score = job.confidence_score
 
     error_message = None
     if job.status == JobStatus.FAILED.value:
         error_message = job.error_message
 
     return JobStatusResponse(
-        job_id=UUID(job.id),
+        job_id=UUID(job.job_id),
         status=job.status,
         created_at=job.created_at,
         completed_at=job.completed_at,
-        original_text=transcription_text,  # Map to original_text for now
-        processed_text=transcription_text,  # Will be different after post-processing is implemented
-        error_message=error_message
+        original_text=original_text,
+        processed_text=processed_text,
+        error_message=error_message,
+        correction_count=correction_count,
+        fuzzy_match_count=fuzzy_match_count,
+        confidence_score=confidence_score
     )

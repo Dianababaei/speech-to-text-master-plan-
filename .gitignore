@@ -95,5 +95,15 @@ transcriptions/
 transcription_results.txt
 transcriptions.csv
 
+# Test artifacts and results
+result_*.json
+job_*.json
+test_*.json
+*_result.json
+*_submit.json
+comparison_results/
+*.bat
+*_id.txt
+
 # Pre-commit
 .pre-commit-config.yaml.backup

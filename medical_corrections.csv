@@ -238,3 +238,27 @@ term,replacement,category
 نورمان,نرمال,medical_term
 انهاراف,انحراف,medical_term
 هوادار شدن,حفره شدن,medical_term
+# Additional corrections from transcription analysis
+رعزمگاه,رضازاده,medical_term
+شفیزاده,شفیع‌زاده,medical_term
+فارمیشن,formation,medical_term
+حوادر,حفره,medical_term
+حواهد,حفره,medical_term
+سیگمان,سگمنت,medical_term
+پارکاردیاک,پریکاردیاک,medical_term
+اسئیدی,اندازه,medical_term
+مو ساویه,مساوی,medical_term
+ادیازتان,مدیاستن,medical_term
+نرمان,نرمال,medical_term
+می دواند,می‌تواند,medical_term
+رویعت,رؤیت,medical_term
+ارجعیت,ارجحیت,medical_term
+یفته,یافته,medical_term
+نواهی,نواحی,medical_term
+پریوهنتریگولار,پری‌ونتریکولار,medical_term
+دوکسی,ونتریکولار,medical_term
+کوده,کد,medical_term
+سند,سمت,medical_term
+دپوزیشن,رسوب,medical_term
+اینش,آن,cleanup_artifact
+دوطرف,دوطرفه,medical_term
